@@ -65,7 +65,7 @@ parser.add_argument('--model-number', type=int, required=True, help="Checkpoint 
 parser.add_argument('--area', type=str, default='all', choices=list(special_areas.keys()), 
 help="Area to run analysis on. Defaults to 'All' which performs analysis over the whole domain")
 parser.add_argument('--num-samples', type=int, default=None, help="Number of samples to use")
-parser.add_argument('--climatological-data-path', type=str, default='/network/group/aopp/predict/HMC005_ANTONIO_EERIE/cgan_data/daily_rainfall', help="Folder containing climatological data to load")
+parser.add_argument('--climatological-data-path', type=str, required=True, help="Folder containing climatological data to load")
 metric_group = parser.add_argument_group('metrics')
 metric_group.add_argument('-ex', '--examples', action="store_true", help="Plot a selection of example precipitation forecasts")
 metric_group.add_argument('-sc', '--scatter', action="store_true", help="Plot scatter plots of domain averaged rainfall")

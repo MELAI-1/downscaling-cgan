@@ -593,7 +593,9 @@ def get_fss_scores(truth_array, fss_data_dict, hourly_thresholds, window_sizes, 
     fss_results = {'thresholds': hourly_thresholds, 'window_sizes': window_sizes, 'scores': {}}
 
     for data_name, data_array in tqdm(fss_data_dict.items()):
+        
         fss_results['scores'][data_name] = []
+
         for thr in hourly_thresholds:
 
             tmp_fss = []
@@ -603,4 +605,5 @@ def get_fss_scores(truth_array, fss_data_dict, hourly_thresholds, window_sizes, 
                 tmp_fss.append(fss(truth_array[:n_samples, :, :], data_array, w, thr, mode='constant'))
             
             fss_results['scores'][data_name].append(tmp_fss)
+            
     return fss_results
