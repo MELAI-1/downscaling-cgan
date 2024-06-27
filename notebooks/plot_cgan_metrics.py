@@ -6,7 +6,7 @@
 #       extension: .py
 #       format_name: percent
 #       format_version: '1.3'
-#       jupytext_version: 1.16.2
+#       jupytext_version: 1.16.1
 #   kernelspec:
 #     display_name: Python 3 (ipykernel)
 #     language: python
@@ -63,12 +63,13 @@ from dsrnngan.evaluation.benchmarks import QuantileMapper
 from dsrnngan.utils import read_config
 from dsrnngan.evaluation.evaluation import get_fss_scores
 
-BASE_MODEL_PATH = '/network/group/aopp/predict/HMC005_ANTONIO_EERIE/cgan_data'
+# BASE_MODEL_PATH = '/network/group/aopp/predict/HMC005_ANTONIO_EERIE/cgan_data'
+BASE_MODEL_PATH = '/user/work/uz22147/logs/cgan/'
 
 
 # %%
-model_type = 'final-nologs-mam2018'
-area = 'all'
+model_type = 'final-nologs-full'
+area = 'kenya'
 
 log_folders = {
                'final-nologs': {'log_folder': '7c4126e641f81ae0_medium-cl100-final-nologs/n4000_202010-202109_45682_e20', 'model_number': 217600},
@@ -87,8 +88,9 @@ format_lookup = {'cGAN': {'color': 'b', 'marker': '+', 'alpha': 1, 'linestyle': 
 
 model_number = log_folders[model_type]['model_number']
 log_folder = os.path.join(BASE_MODEL_PATH, log_folders[model_type]['log_folder'])
-plot_dir = os.path.join('/network/group/aopp/predict/HMC005_ANTONIO_EERIE/cgan_plots', *log_folder.split('/')[-2:])
-os.makedirs(plot_dir, exist_ok=True)
+plot_dir = os.path.join('/user/home/uz22147/repos/downscaling-cgan/plots', log_folder.split('/')[-1])
+# plot_dir = os.path.join('/network/group/aopp/predict/HMC005_ANTONIO_EERIE/cgan_plots', *log_folder.split('/')[-2:])
+# os.makedirs(plot_dir, exist_ok=True)
 
 try:
     with open(os.path.join(log_folder, f'arrays-{model_number}.pkl'), 'rb') as ifh:
@@ -489,6 +491,21 @@ for ix in tqdm(range(truth_array.shape[0])):
     
     ralsd_rmse_all.append(mse(fft_freq_truth, fft_freq_pred))
 
+
+# %%
+def rapsd_over_samples(array):
+
+    rapsd_results = []
+    for n in range(obs_array.shape[0]):
+
+        fft_freq_pred = rapsd(obs_array[n,:,:], fft_method=np.fft)
+        rapsd_results.append(fft_freq_pred)
+
+    rapsd_results = np.mean(np.stack(rapsd_results, axis=-1), axis=-1)
+
+    return rapsd_results
+
+
 # %%
 from dsrnngan.evaluation.rapsd import rapsd
 
@@ -501,9 +518,11 @@ rapsd_data_dict = {
 rapsd_results = {}
 for k, v in rapsd_data_dict.items():
         rapsd_results[k] = []
-        for n in tqdm(range(n_samples)):
-        
-                fft_freq_pred = rapsd(v['data'][n,:,:], fft_method=np.fft)
+
+        tmp_data = v['data']
+        for n in tqdm(range(tmp_data.shape[0])):
+
+                fft_freq_pred = rapsd(tmp_data[n,:,:], fft_method=np.fft)
                 rapsd_results[k].append(fft_freq_pred)
 
         rapsd_results[k] = np.mean(np.stack(rapsd_results[k], axis=-1), axis=-1)
@@ -725,14 +744,58 @@ axs.text(q_99pt99 + 7 , 10**7, '$99.99^{th}$')
 plt.savefig(os.path.join(plot_dir, f'histograms_{model_type}_{model_number}_{area}.pdf'), format='pdf', bbox_inches='tight')
 
 
+# %% [markdown]
+# ## Histograms comparing training and test data
+
 # %%
-# Training data histogram for March-May
+area='all'
+latitude_range, lat_range_index, longitude_range, lon_range_index = get_area_range(data_config, area=area)
 
-with open('/network/group/aopp/predict/HMC005_ANTONIO_EERIE/cgan_data/truth-mam-only.pkl', 'rb') as ifh:
-    train_array_mam = pickle.load(ifh)
+# %%
+# Training data
 
-train_array_mam = train_array_mam[:,lat_range_index[0]: lat_range_index[1]+1, lon_range_index[0]: lon_range_index[1]+1]
+with open('/user/work/uz22147/logs/cgan/7c4126e641f81ae0_medium-cl100-final-nologs/n18000_201603-202009_6f02b_e1/arrays-217600.pkl', 'rb') as ifh:
+    arrays = pickle.load(ifh)
 
+train_obs_array = arrays['truth']
+training_dates = arrays['dates']
+
+train_obs_array = train_obs_array[:,lat_range_index[0]: lat_range_index[1]+1, lon_range_index[0]: lon_range_index[1]+1]
+del arrays
+
+relevant_ixs = [n for n, dt in enumerate(training_dates) if dt[0].month in (3,4,5)]
+
+train_obs_array_mam = train_obs_array[relevant_ixs, :, :]
+
+
+# %%
+# Normal testing period
+
+with open('/user/work/uz22147/logs/cgan/7c4126e641f81ae0_medium-cl100-final-nologs/n8640_202010-202109_45682_e1/arrays-217600.pkl', 'rb') as ifh:
+    arrays = pickle.load(ifh)
+
+normal_test_obs_array = arrays['truth']
+normal_test_dates = arrays['dates']
+
+normal_test_obs_array = normal_test_obs_array[:,lat_range_index[0]: lat_range_index[1]+1, lon_range_index[0]: lon_range_index[1]+1]
+del arrays
+
+relevant_ixs = [n for n, dt in enumerate(normal_test_dates) if dt[0].month in (3,4,5)]
+
+normal_test_obs_array_mam = normal_test_obs_array[relevant_ixs, :, :]
+
+
+# %%
+# MAM 2018 testing period
+
+with open('/user/work/uz22147/logs/cgan/7c4126e641f81ae0_medium-cl100-final-nologs/n2088_201803-201805_f37bd_e1/arrays-217600.pkl', 'rb') as ifh:
+    arrays = pickle.load(ifh)
+
+mam_2018_test_obs_array = arrays['truth']
+mam_2018_test_dates = arrays['dates']
+
+mam_2018_test_obs_array = mam_2018_test_obs_array[:,lat_range_index[0]: lat_range_index[1]+1, lon_range_index[0]: lon_range_index[1]+1]
+del arrays
 
 # %%
 from itertools import chain
@@ -745,10 +808,14 @@ fig, axs = plt.subplots(1,1, figsize=(12,10))
 fig.tight_layout(pad=4)
 bin_boundaries=np.arange(0,300,4)
 
-assert truth_array.shape[1:] == train_array_mam.shape[1:]
+assert mam_2018_test_obs_array.shape[1:] == train_obs_array.shape[1:]
 
-data_dict = {'IMERG test': {'data': truth_array, 'histtype': 'stepfilled', 'alpha':0.6, 'facecolor': 'grey'}, 
-             'IMERG train': {'data': train_array_mam, 'histtype': 'step', 'edgecolor': 'red'}}
+data_dict = {
+             'IMERG train MAM': {'data': train_obs_array_mam, 'histtype': 'stepfilled', 'alpha':0.6, 'facecolor': 'grey'}, 
+             'IMERG test normal MAM': {'data': normal_test_obs_array_mam, 'histtype': 'step', 'edgecolor': 'blue'},
+             'IMERG test MAM 2018': {'data': mam_2018_test_obs_array, 'histtype': 'step', 'edgecolor': 'green', 'linestyle': '--'},
+             'IMERG test normal full': {'data': normal_test_obs_array, 'histtype': 'step', 'edgecolor': 'red', 'linestyle': '--'},
+             }
 rainfall_amounts = {}
 
 edge_colours = ["blue", "green", "red", 'orange']
@@ -763,7 +830,75 @@ axs.set_xlabel('Rainfall (mm/hr)')
 axs.set_ylabel('Frequency of occurence')
 axs.set_xlim([0,150])
 
-# plt.savefig(os.path.join(plot_dir, f'histograms_train_comparison_{model_type}_{model_number}_{area}.pdf'), format='pdf', bbox_inches='tight')
+# plot_fp = os.path.join(plot_dir, f'histograms_train_obs_comparison_{model_type}_{model_number}_{area}.pdf')
+# plt.savefig(plot_fp, format='pdf', bbox_inches='tight')
+
+# %%
+from itertools import chain
+
+(q_99pt9, q_99pt99) = np.quantile(truth_array, [0.999, 0.9999])
+
+plt.rcParams.update({'font.size': 20})
+
+fig, axs = plt.subplots(1,1, figsize=(12,10))
+fig.tight_layout(pad=4)
+bin_boundaries=np.arange(0,300,4)
+
+assert truth_array.shape[1:] == train_obs_array.shape[1:]
+
+data_dict = {'IFS test': {'data': fcst_array, 'histtype': 'stepfilled', 'alpha':0.6, 'facecolor': 'grey'}, 
+             'IFS train MAM': {'data': train_fcst_array_mam, 'histtype': 'step', 'edgecolor': 'red'},
+             'IFS train': {'data': train_fcst_array, 'histtype': 'step', 'edgecolor': 'red', 'linestyle': '--'}}
+rainfall_amounts = {}
+
+edge_colours = ["blue", "green", "red", 'orange']
+for n, (name, d) in enumerate(data_dict.items()):
+    
+    axs.hist(d['data'].flatten(), bins=bin_boundaries, histtype=d['histtype'], label=name, alpha=d.get('alpha'),
+                facecolor=d.get('facecolor'), edgecolor=d.get('edgecolor'), linestyle= d.get('linestyle'), linewidth=3, density=True)
+    
+axs.set_yscale('log')
+axs.legend()
+axs.set_xlabel('Rainfall (mm/hr)')
+axs.set_ylabel('Frequency of occurence')
+axs.set_xlim([0,150])
+
+plot_fp = os.path.join(plot_dir, f'histograms_train_ifs_comparison_{model_type}_{model_number}_{area}.pdf')
+plt.savefig(plot_fp, format='pdf', bbox_inches='tight')
+
+# %%
+from itertools import chain
+
+(q_99pt9, q_99pt99) = np.quantile(truth_array, [0.999, 0.9999])
+
+plt.rcParams.update({'font.size': 20})
+
+fig, axs = plt.subplots(1,1, figsize=(12,10))
+fig.tight_layout(pad=4)
+bin_boundaries=np.arange(0,300,4)
+
+assert truth_array.shape[1:] == train_obs_array.shape[1:]
+
+data_dict = {'IMERG test': {'data': truth_array, 'histtype': 'stepfilled', 'alpha':0.6, 'facecolor': 'grey'}, 
+             'IMERG train MAM': {'data': train_obs_array_mam, 'histtype': 'step', 'edgecolor': 'black'},
+             'IMERG train': {'data': train_obs_array, 'histtype': 'step', 'edgecolor': 'black', 'linestyle': '--'},
+             }
+rainfall_amounts = {}
+
+edge_colours = ["blue", "green", "red", 'orange']
+for n, (name, d) in enumerate(data_dict.items()):
+    
+    axs.hist(d['data'].flatten(), bins=bin_boundaries, histtype=d['histtype'], label=name, alpha=d.get('alpha'),
+                facecolor=d.get('facecolor'), edgecolor=d.get('edgecolor'), linestyle= d.get('linestyle'), linewidth=3, density=True)
+    
+axs.set_yscale('log')
+axs.legend()
+axs.set_xlabel('Rainfall (mm/hr)')
+axs.set_ylabel('Frequency of occurence')
+axs.set_xlim([0,150])
+
+plot_fp = os.path.join(plot_dir, f'histograms_train_obs_comparison_{model_type}_{model_number}_{area}.pdf')
+plt.savefig(plot_fp, format='pdf', bbox_inches='tight')
 
 # %% [markdown]
 # ### Bias
