@@ -4,8 +4,8 @@
 #SBATCH --mem=200gb
 #SBATCH --ntasks-per-node=1
 #SBATCH --cpus-per-task=4
-#SBATCH --job-name=bootstrap
-#SBATCH --partition shared
+#SBATCH --job-name=bstrap-ets
+#SBATCH --partition short,dmm,compute
 #SBATCH --output=logs/bstrap-ets-%A.out
 
 # source ~/.bashrc
@@ -23,7 +23,7 @@ echo running bootstrapping ets
 dt=$(date '+%d/%m/%Y %H:%M:%S');
 echo "$dt"
 
-srun python -m scripts.bootstrap_ets --log-folder /network/group/aopp/predict/HMC005_ANTONIO_EERIE/cgan_data/7c4126e641f81ae0_medium-cl100-final-nologs/n8640_202010-202109_45682_e1 --model-number 217600 --n-bootstrap-samples 50
+srun python -m scripts.bootstrap_ets --log-folder /user/work/uz22147/logs/cgan/7c4126e641f81ae0_medium-cl100-final-nologs/n8640_202010-202109_45682_e1 --model-number 217600 --n-bootstrap-samples 50
 
 dt=$(date '+%d/%m/%Y %H:%M:%S');
 echo "$dt"

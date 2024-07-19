@@ -20,13 +20,14 @@ tz_finder = TimezoneFinder()
 from_zone = tz.gettz('UTC')
 
 special_areas = {'all': {'lat_range': None, 'abbrv': 'ALL'},
-                 'lake_victoria': {'lat_range': [-5.05,3.05], 'lon_range': [29.05, 37.05], 'abbrv': 'LV'},
+                 'lake_victoria': {'lat_range': [-4.05,2.05], 'lon_range': [29.05, 37.05], 'abbrv': 'LV'},
                  'somalia': {'lat_range': [-1.05,4.05], 'lon_range': [40.0, 44.05],  'abbrv': 'S'},
                  'coast': {'lat_range': [-11.05, -4.70 ], 'lon_range': [38.0,39.0],  'abbrv': 'C'},
                  'west_lv_basin': {'lat_range': [-4.70,0.30], 'lon_range': [29.5,31.3],  'abbrv': 'WLVB'},
                  'east_lv_basin': {'lat_range': [-3.15, 1.55], 'lon_range': [34.5,36.0],  'abbrv': 'ELVB'},
                  'nw_ethiopian_highlands': {'lat_range': [6.10, 14.15], 'lon_range': [34.60, 40.30], 'abbrv': 'NWEH'},
-                 'kenya': {'lat_range': [-4.65, 5.15], 'lon_range': [33.25, 42.15], 'abbrv': 'K'},
+                 'kenya': {'lat_range': [-4.65, 5.15], 'lon_range': [34.05, 42.15], 'abbrv': 'K'},
+                 'kenya_core': {'lat_range': [-4.05, 1.15], 'lon_range': [34.05, 39.05], 'abbrv': 'KC'}
 
 }
 

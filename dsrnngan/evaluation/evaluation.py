@@ -463,6 +463,7 @@ def evaluate_multiple_checkpoints(
                                        shuffle=shuffle,
                                        batch_size=batch_size,
                                        use_training_data=use_training_data)
+
     header = True
 
     for model_number in model_numbers:

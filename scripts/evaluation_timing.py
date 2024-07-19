@@ -8,6 +8,7 @@ import logging
 from glob import glob
 from types import SimpleNamespace
 from tensorflow import config as tf_config
+import tensorflow as tf
 
 import matplotlib; matplotlib.use("Agg")  # noqa: E702
 import numpy as np
@@ -18,6 +19,7 @@ from dsrnngan.evaluation import evaluation
 from dsrnngan.utils import read_config, utils
 from dsrnngan.model import setupmodel, train
 from unittest import mock
+from dsrnngan.model.noise import NoiseGenerator
 
 
 logger = logging.getLogger(__name__)
@@ -41,7 +43,7 @@ num_constant_fields = 2
 num_input_fields = 10
 num_output_fields = 10 # Note: assuming all outputs can be produced simultaneously
 
-latitude_range, longitude_range = utils.get_lat_lon_range_from_config(data_config=data_config)
+latitude_range, longitude_range = read_config.get_lat_lon_range_from_config(data_config=data_config)
 data_config.input_image_height = len(latitude_range)
 data_config.input_image_width = len(longitude_range)
     
@@ -65,38 +67,41 @@ parser.add_argument('--eval-ensemble-size', type=int, default=1,
                     help="Size of ensemble to evaluate on")
 parser.add_argument('--debug', action='store_true')                
 
-# def blah():
-#     t=1
-#     return  [{'lo_res_inputs': np.random.rand(1,  *input_image_shape),
-#                     'hi_res_inputs': np.random.rand(1, *constants_image_shape)},
-#                     {'output': np.random.rand(*output_image_shape)}]
-# @mock.patch.multiple('dsrnngan.data.data_generator.DataGenerator', 
-#                     __init__=mock.MagicMock(return_value=None), 
-#                     __getitem__=mock.MagicMock(return_value=blah()))
 def main():
     
-    
+    num_samples = 20
     
     # Create dummy model here
     model = setupmodel.setup_model(
             model_config=model_config,
             data_config=data_config)
     gen = model.gen
-    # model_weights_root = os.path.join(args.model_folder, "models")
-    # os.makedirs(model_weights_root, exist_ok=True)
+    gen.load_weights('/user/work/uz22147/logs/cgan/7c4126e641f81ae0_medium-cl100-final-nologs/models/gen_weights-0217600.h5')
+        start_time = time.time()
+    for n in range(20):
+        frozen_func(tf.convert_to_tensor(inputs_array, dtype=tf.float32), 
+        tf.convert_to_tensor(constants_array, dtype=tf.float32), 
+        tf.convert_to_tensor(nn, dtype=tf.float32))
+    end_time = time.time()
+
+    print('Time taken: ')
+    full_model = tf.function(lambda x, y, z: gen([x,y,z]))
+    full_model = full_model.get_concrete_function(
+    x=tf.TensorSpec(gen.inputs[0].shape, gen.inputs[0].dtype), 
+    y=tf.TensorSpec(gen.inputs[1].shape, gen.inputs[1].dtype), 
+    z=tf.TensorSpec(gen.inputs[2].shape, gen.inputs[2].dtype))
     
-    # model.save(model_weights_root)
-    # TODO: wait time for average file load time.
-    
-    # Mock output
-    samples_gen = evaluation.generate_gan_sample(gen=gen, 
-                        cond=inputs_array, 
-                        const=constants_array, 
-                        noise_channels=model_config.generator.noise_channels, 
-                        ensemble_size=1, 
-                        batch_size=1)
-    
-    t=1
+    frozen_func = convert_variables_to_constants_v2(full_model)
+    frozen_func.graph.as_graph_def()
+
+    start_time = time.time()
+    for n in range(20):
+        frozen_func(tf.convert_to_tensor(inputs_array, dtype=tf.float32), 
+        tf.convert_to_tensor(constants_array, dtype=tf.float32), 
+        tf.convert_to_tensor(nn, dtype=tf.float32))
+    end_time = time.time()
+
+    print('Time taken: ')
     
 
 if __name__ == "__main__":

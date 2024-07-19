@@ -237,7 +237,7 @@
             "justMyCode": true,
             "args": [
                 "--no-train",
-                "--num-images",
+                "--num-eval-images",
                 "1",
                 "--eval-model-numbers",
                 "217600",
@@ -245,8 +245,7 @@
                 "1",
                 "--model-folder",
                 "/user/work/uz22147/logs/cgan/7c4126e641f81ae0_medium-cl100-final-nologs",
-                "--debug",
-                "--eval-on-train-set"
+                "--debug"
             ],
             "cwd": "/user/home/uz22147/repos/downscaling-cgan"
         },

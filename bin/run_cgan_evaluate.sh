@@ -55,10 +55,10 @@ echo "$dt"
 
 # srun python -m dsrnngan.main --no-train --save-generated-samples --eval-model-numbers 230400 --no-shuffle-eval --model-folder /user/work/uz22147/logs/cgan/7c4126e641f81ae0_medium-cl100-final-nologs --num-images 2900 --eval-ensemble-size 20;
 
-srun python -m dsrnngan.main --no-train --save-generated-samples --eval-model-numbers 268800 --no-shuffle-eval --model-folder /user/work/uz22147/logs/cgan/998e5f0f54106b35_medium-cl50-nologs-nocrop-seplake --num-images 2900 --eval-ensemble-size 1;
+# srun python -m dsrnngan.main --no-train --eval-model-numbers 268800 --no-shuffle-eval --model-folder /user/work/uz22147/logs/cgan/998e5f0f54106b35_medium-cl50-nologs-nocrop-seplake --num-images 2900 --eval-ensemble-size 1;
 # srun python -m dsrnngan.main --no-train --save-generated-samples --eval-model-numbers 230400 --no-shuffle-eval --model-folder /user/work/uz22147/logs/cgan/ec66788090f69890_small-cl50-lvonly --num-images 2900 --eval-ensemble-size 1;
 
-# srun python -m dsrnngan.main --no-train  --eval-model-numbers 217600 --save-generated-samples --model-folder /user/work/uz22147/logs/cgan/7c4126e641f81ae0_medium-cl100-final-nologs --num-images 1000 --eval-ensemble-size 100 --val-ym-start 202010 --val-ym-end 202109;
+srun python -m dsrnngan.main --no-train  --eval-model-numbers 217600 --model-folder /user/work/uz22147/logs/cgan/7c4126e641f81ae0_medium-cl100-final-nologs --num-samples 10 --eval-ensemble-size 1 --val-ym-start 202010 --val-ym-end 202011;
 
 # srun python -m dsrnngan.main --no-train --no-shuffle-eval --eval-model-numbers 217600 --save-generated-samples --model-folder /user/work/uz22147/logs/cgan/7c4126e641f81ae0_medium-cl100-final-nologs --num-images 2088 --eval-ensemble-size 1 --val-ym-start 201803 --val-ym-end 201805;
 

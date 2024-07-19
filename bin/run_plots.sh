@@ -20,7 +20,7 @@ echo running plots for cgan
 dt=$(date '+%d/%m/%Y %H:%M:%S');
 echo "$dt"
 
-srun python -m scripts.make_plots --nickname cl100-medium-nologs-fullyear --model-eval-folder /network/group/aopp/predict/HMC005_ANTONIO_EERIE/cgan_data/7c4126e641f81ae0_medium-cl100-final-nologs/n8640_202010-202109_45682_e1 --model-number 217600 --output-dir /network/group/aopp/predict/HMC005_ANTONIO_EERIE/cgan_plots --diurnal -ex -qq -rapsd -hist -csi -fss;
+srun python -m scripts.make_plots --nickname cl100-medium-nologs-fullyear --model-eval-folder /user/work/uz22147/logs/cgan/7c4126e641f81ae0_medium-cl100-final-nologs/n8640_202010-202109_45682_e1 --model-number 217600 --output-dir /user/home/uz22147/repos/downscaling-cgan/plots -fss --climatological-data-path /bp1/geog-tropical/users/uz22147/east_africa_data/daily_rainfall;
 
 # srun python -m scripts.make_plots --nickname cl100-small-nologs --log-folder /user/work/uz22147/logs/cgan/a4822ed35a44475d_small-cl100-nologs/n2900_201806-201903_42e34_e1 --model-number 57600 --diurnal -ex -qq -rapsd -hist -csi --output-dir /user/home/uz22147/repos/downscaling-cgan/plots
 # srun python -m scripts.make_plots --nickname cl100-small-nologs-nocrop --log-folder /user/work/uz22147/logs/cgan/a4822ed35a44475d_small-cl100-nologs-nocrop/n2900_201806-201903_42e34_e1 --model-number 52800 --diurnal -ex -qq -rapsd -hist -csi --output-dir /user/home/uz22147/repos/downscaling-cgan/plots

@@ -293,12 +293,16 @@ def plot_precipitation(ax: plt.Axes,
                        title:str, 
                        longitude_range: Iterable[float]=default_longitude_range, 
                        latitude_range: Iterable[float]=default_latitude_range,
+                       precip_cmap=None,
+                       precip_norm=None,
                        levels: List[int]=None):
     if levels is None:
         levels = [0, 0.1, 1, 2.5, 5, 10, 15, 20, 30, 40, 50, 70, 100, 150]
-        
-    precip_cmap = ListedColormap(metpy_plots.ctables.colortables["precipitation"][:len(levels)-1], 'precipitation')
-    precip_norm = BoundaryNorm(levels, precip_cmap.N)
+    
+    if precip_cmap is None:
+        precip_cmap = ListedColormap(metpy_plots.ctables.colortables["precipitation"][:len(levels)-1], 'precipitation')
+    if precip_norm is None:
+        precip_norm = BoundaryNorm(levels, precip_cmap.N)
 
     ax.coastlines(resolution='10m', color='black', linewidth=0.4)
             

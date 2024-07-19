@@ -25,7 +25,7 @@ parser.add_argument('--log-folder', type=str, help='model log folder', required=
 parser.add_argument('--area', type=str, default='all', choices=list(special_areas.keys()), 
 help="Area to run analysis on. Defaults to 'all' which performs analysis over the whole domain")
 parser.add_argument('--model-number', type=str, help='model number', required=True)
-parser.add_argument('--n-bootstrap-samples', type=int, default=1000,
+parser.add_argument('--n-bootstrap-samples', type=int, default=100,
                     help='Number of bootstrap samples to use.')
 parser.add_argument('--plot', action='store_true', help='Make plots')
 args = parser.parse_args()

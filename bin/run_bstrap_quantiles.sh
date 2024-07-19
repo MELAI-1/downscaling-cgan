@@ -1,10 +1,10 @@
 #!/bin/bash
 #SBATCH --nodes=1
 #SBATCH --time=3-0:00:00
-#SBATCH --mem=300gb
+#SBATCH --mem=200gb
 #SBATCH --ntasks-per-node=1
 #SBATCH --cpus-per-task=4
-#SBATCH --job-name=bootstrap
+#SBATCH --job-name=bstrap-qq
 #SBATCH --partition short,dmm,compute
 #SBATCH --output=logs/bstrap-%A.out
 
@@ -23,7 +23,8 @@ echo running plots for cgan
 dt=$(date '+%d/%m/%Y %H:%M:%S');
 echo "$dt"
 
-srun python -m scripts.bootstrap_quantiles --log-folder /user/work/uz22147/logs/cgan/7c4126e641f81ae0_medium-cl100-final-nologs/n4000_202010-202109_45682_e20 --model-number 217600
+# srun python -m scripts.bootstrap_quantiles --log-folder /user/work/uz22147/logs/cgan/7c4126e641f81ae0_medium-cl100-final-nologs/n8640_202010-202109_45682_e1 --model-number 217600
+srun python -m scripts.bootstrap_quantiles --log-folder /user/work/uz22147/logs/cgan/7c4126e641f81ae0_medium-cl100-final-nologs/n2088_201803-201805_f37bd_e1 --model-number 217600 --area kenya
 
 dt=$(date '+%d/%m/%Y %H:%M:%S');
 echo "$dt"

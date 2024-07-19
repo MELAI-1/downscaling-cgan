@@ -23,7 +23,9 @@ echo running bootstrapping fss
 dt=$(date '+%d/%m/%Y %H:%M:%S');
 echo "$dt"
 
-srun python -m scripts.bootstrap_fss --log-folder /user/work/uz22147/logs/cgan/7c4126e641f81ae0_medium-cl100-final-nologs/n4000_202010-202109_45682_e20 --model-number 217600 --n-bootstrap-samples 50
+# srun python -m scripts.bootstrap_fss --log-folder /user/work/uz22147/logs/cgan/7c4126e641f81ae0_medium-cl100-final-nologs/n4000_202010-202109_45682_e20 --model-number 217600 --n-bootstrap-samples 50 
+
+srun python -m scripts.bootstrap_fss --log-folder /user/work/uz22147/logs/cgan/7c4126e641f81ae0_medium-cl100-final-nologs/n2088_201803-201805_f37bd_e1 --model-number 217600 --n-bootstrap-samples 50 --area kenya
 
 dt=$(date '+%d/%m/%Y %H:%M:%S');
 echo "$dt"
