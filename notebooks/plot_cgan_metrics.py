@@ -39,7 +39,7 @@ from matplotlib.colors import ListedColormap, BoundaryNorm
 from string import ascii_lowercase
 
 from zoneinfo import ZoneInfo
-from datetime import datetime, timezone
+from datetime import datetime, timezone, date
 
 HOME = Path(os.getcwd()).parents[0]
 sys.path.insert(1, str(HOME))
@@ -60,7 +60,7 @@ from dsrnngan.evaluation.thresholded_ranks import findthresh
 from dsrnngan.evaluation import scoring
 from dsrnngan.utils.utils import get_best_model_number, load_yaml_file, special_areas, get_area_range
 from dsrnngan.evaluation.benchmarks import QuantileMapper
-from dsrnngan.utils import read_config
+from dsrnngan.utils import read_config, utils
 from dsrnngan.evaluation.evaluation import get_fss_scores
 
 # BASE_MODEL_PATH = '/network/group/aopp/predict/HMC005_ANTONIO_EERIE/cgan_data'
@@ -68,7 +68,7 @@ BASE_MODEL_PATH = '/user/work/uz22147/logs/cgan/'
 
 
 # %%
-model_type = 'final-nologs-full'
+model_type = 'final-nologs'
 area = 'kenya'
 
 log_folders = {
@@ -134,6 +134,7 @@ try:
     model_config, data_config = read_config.get_config_objects(config)
 except FileNotFoundError:
     data_config = read_config.read_data_config(config_folder=base_folder)
+    model_config = read_config.read_model_config(config_folder=base_folder)
 
 latitude_range, lat_range_index, longitude_range, lon_range_index = get_area_range(data_config, area=area)
 
@@ -219,11 +220,22 @@ os.path.join(plot_dir, f'return_periods_train_{area}.pdf')
 # ## Plot Examples
 
 # %%
+levels = [0, 0.1, 1, 2.5, 5, 10, 15, 20, 30, 40, 50, 70, 100, 150] # in units of log10
+# precip_cmap = ListedColormap(metpy_plots.ctables.colortables["precipitation"][:len(levels)-1], 'precipitation')
+# precip_cmap = ListedColormap(cmocean.cm.rain(np.linspace(0,1,len(levels)-1)), 'precipitation')
+# precip_cmap = ListedColormap(mpl.colormaps['brg'](np.linspace(0,0.5,len(levels)-1)), 'precipitation')
+precip_cmap = ListedColormap(mpl.colormaps['turbo'](np.linspace(0,1,len(levels)-1)), 'precipitation')
+precip_norm = BoundaryNorm(levels, precip_cmap.N)
+
+no_rain_limit = 0.1
+
+# %%
 from dsrnngan.data.data import DEFAULT_LATITUDE_RANGE, DEFAULT_LONGITUDE_RANGE, all_ifs_fields
 import seaborn as sns
 from matplotlib.colors import ListedColormap, BoundaryNorm
 import random
 from datetime import datetime, timedelta
+import cmocean
 
 means = [(n, truth_array[n,:,:].mean()) for n in range(n_samples)]
 sorted_means = sorted(means, key=lambda x: x[1])
@@ -232,10 +244,6 @@ n_extreme_hours = 50
 
 tp_index = all_ifs_fields.index('tp')
 
-# plot configurations
-levels = [0, 0.1, 1, 2.5, 5, 10, 15, 20, 30, 40, 50, 70, 100, 150] # in units of log10
-precip_cmap = ListedColormap(metpy_plots.ctables.colortables["precipitation"][:len(levels)-1], 'precipitation')
-precip_norm = BoundaryNorm(levels, precip_cmap.N)
 
 plt.rcParams.update({'font.size': 11})
 spacing = 10
@@ -251,8 +259,6 @@ indexes = [n for n, item in enumerate(all_datetimes) if item in datetimes_to_plo
 num_cols = 5
 num_samples = len(indexes)
 num_rows = num_samples
-
-rows = [[f'cgan_sample_{n}', f'cgan_mean_{n}', f'imerg_{n}', f'ifs_{n}', f'ifs_qmap_{n}', 'cbar'] for n in range(num_rows)]
 
 fig = plt.figure(constrained_layout=True, figsize=(2.5*num_cols, 3*num_rows))
 gs = gridspec.GridSpec(num_rows + 1, num_cols, figure=fig, 
@@ -275,12 +281,21 @@ for n in tqdm(range(len(indexes))):
     data_lookup = {'cgan_sample': {'data': img_gens[:,:,0], 'title': 'cGAN-qm'},
                    'cgan_mean': {'data': avg_img_gens, 'title': f'cGAN-qm sample average'},
                    'imerg' : {'title': f"IMERG: {date_str}", 'data': truth},
-                   'ifs': {'data': fcst, 'title': 'IFS-qm'}
+                   'ifs': {'data': fcst_corr, 'title': 'IFS-qm'}
                                                          }
     for col, (k, val) in enumerate(data_lookup.items()):
-   
+        
+        precip_data = val['data']
+        precip_data[precip_data < no_rain_limit] = np.nan
+        
         ax = fig.add_subplot(gs[n, col], projection = ccrs.PlateCarree())
-        im = plot_precipitation(ax, data=val['data'], title=val['title'], longitude_range=longitude_range, latitude_range=latitude_range)
+        im = plot_precipitation(ax, 
+        data=precip_data, 
+        title=val['title'], 
+        precip_cmap=precip_cmap,
+        precip_norm=precip_norm,
+        longitude_range=longitude_range, 
+        latitude_range=latitude_range)
 
 
 cbar_ax = fig.add_subplot(gs[-1, :])
@@ -289,6 +304,86 @@ cb = fig.colorbar(im, cax=cbar_ax, orientation='horizontal', shrink = 0.2, aspec
 cb.ax.set_xlabel("Precipitation (mm / hr)", loc='center')
 
 plot_fp = os.path.join(plot_dir, f'cGAN_samples_IFS_{model_type}_{model_number}_{area}.pdf')
+plt.savefig(plot_fp, format='pdf')
+
+# %%
+plot_fp
+
+# %%
+from dsrnngan.data.data import DEFAULT_LATITUDE_RANGE, DEFAULT_LONGITUDE_RANGE, all_ifs_fields
+import seaborn as sns
+from matplotlib.colors import ListedColormap, BoundaryNorm
+import random
+from datetime import datetime, timedelta
+import cmocean
+
+means = [(n, truth_array[n,:,:].mean()) for n in range(n_samples)]
+sorted_means = sorted(means, key=lambda x: x[1])
+
+n_extreme_hours = 50
+
+tp_index = all_ifs_fields.index('tp')
+
+
+plt.rcParams.update({'font.size': 11})
+spacing = 10
+units = "Rain rate [mm h$^{-1}$]"
+precip_levels=np.arange(0, 1.5, 0.15)
+
+
+all_datetimes = [date + timedelta(hours=hours[n]) for n, date in enumerate(dates)]
+# datetimes_to_plot = [datetime(2020,10,21,21,0,0), datetime(2020,12,17,5,0,0),datetime(2021,5,8,8,0,0), datetime(2021,2,19,17,0,0)]
+datetimes_to_plot = [datetime(2021,5,8,8,0,0)]
+indexes = [n for n, item in enumerate(all_datetimes) if item in datetimes_to_plot]
+
+
+num_cols = 3
+num_samples = len(indexes)
+num_rows = num_samples
+
+fig = plt.figure(constrained_layout=True, figsize=(2.5*num_cols, 4*num_rows))
+gs = gridspec.GridSpec(num_rows + 1, num_cols, figure=fig, 
+                       width_ratios=[1]*(num_cols - 1) + [0.05],
+                       height_ratios=[1]*(num_rows) + [0.05],
+                       wspace=0.005)                      
+for n in tqdm(range(len(indexes))):
+
+    ix = indexes[n]
+    img_gens = samples_gen_array[ix, :,:,:]
+    truth = truth_array[ix,:,:]
+    fcst = fcst_array[ix,:,:]
+    fcst_corr = fcst_corrected[ix, :, :]
+    date = dates[ix]
+    hour = hours[ix]
+    avg_img_gens = img_gens.mean(axis=-1)
+    date_str = date.strftime('%d-%m-%Y') + f' {hour:02d}:00:00'
+    
+    # cGAN
+    data_lookup = {
+                   'ifs': {'data': fcst, 'title': 'IFS'},
+                   'ifs-qm': {'data': fcst_corr, 'title': 'IFS-qm'}
+                                                         }
+    for col, (k, val) in enumerate(data_lookup.items()):
+        
+        precip_data = val['data']
+        precip_data[precip_data < no_rain_limit] = np.nan
+        
+        ax = fig.add_subplot(gs[n, col], projection = ccrs.PlateCarree())
+        im = plot_precipitation(ax, 
+        data=precip_data, 
+        title=val['title'], 
+        precip_cmap=precip_cmap,
+        precip_norm=precip_norm,
+        longitude_range=longitude_range, 
+        latitude_range=latitude_range)
+
+
+cbar_ax = fig.add_subplot(gs[-1, :])
+cb = fig.colorbar(im, cax=cbar_ax, orientation='horizontal', shrink = 0.2, aspect=10,
+                  )
+cb.ax.set_xlabel("Precipitation (mm / hr)", loc='center')
+
+plot_fp = os.path.join(plot_dir, f'IFS_qmap_example_{model_type}_{model_number}_{area}.pdf')
 plt.savefig(plot_fp, format='pdf')
 
 # %% [markdown]
@@ -528,23 +623,23 @@ for k, v in rapsd_data_dict.items():
         rapsd_results[k] = np.mean(np.stack(rapsd_results[k], axis=-1), axis=-1)
 
 # %%
-from dsrnngan.evaluation.rapsd import rapsd
+# from dsrnngan.evaluation.rapsd import rapsd
 
-rapsd_data_dict = {
-                    'cGAN': {'data': samples_gen_array[:, :, :, 0], 'color': 'b', 'linestyle': '-'},
-                    'IMERG' : {'data': truth_array, 'color': 'k', 'linestyle': '-'},
-                    'IFS': {'data': fcst_array, 'color': 'r', 'linestyle': '-'},
-                    }
+# rapsd_data_dict = {
+#                     'cGAN': {'data': samples_gen_array[:, :, :, 0], 'color': 'b', 'linestyle': '-'},
+#                     'IMERG' : {'data': truth_array, 'color': 'k', 'linestyle': '-'},
+#                     'IFS': {'data': fcst_array, 'color': 'r', 'linestyle': '-'},
+#                     }
 
-rapsd_results = {}
-for k, v in rapsd_data_dict.items():
-        rapsd_results[k] = []
-        for n in tqdm(range(n_samples)):
+# rapsd_results = {}
+# for k, v in rapsd_data_dict.items():
+#         rapsd_results[k] = []
+#         for n in tqdm(range(n_samples)):
         
-                fft_freq_pred = rapsd(v['data'][n,:,:], fft_method=np.fft)
-                rapsd_results[k].append(fft_freq_pred)
+#                 fft_freq_pred = rapsd(v['data'][n,:,:], fft_method=np.fft)
+#                 rapsd_results[k].append(fft_freq_pred)
 
-        rapsd_results[k] = np.mean(np.stack(rapsd_results[k], axis=-1), axis=-1)
+#         rapsd_results[k] = np.mean(np.stack(rapsd_results[k], axis=-1), axis=-1)
 
 # %%
 plt.rcParams.update({'font.size': 20})
@@ -629,7 +724,7 @@ cgan_quantiles = calculate_quantiles(cgan_corrected[:,:,:,0])
 obs_quantiles = calculate_quantiles(truth_array)
 
 # %%
-plot_hist = False
+plot_hist = True
 plt.rcParams.update({'font.size': 11})
 
 if plot_hist:
@@ -707,49 +802,12 @@ plot_fp = os.path.join(plot_dir, f'q-q_hist_{model_type}_{model_number}_{area}.p
 plt.savefig(plot_fp, format='pdf', bbox_inches='tight')
 
 # %% [markdown]
-# ## Histogram
-
-# %%
-from itertools import chain
-
-(q_99pt9, q_99pt99) = np.quantile(truth_array, [0.999, 0.9999])
-
-plt.rcParams.update({'font.size': 20})
-
-fig, axs = plt.subplots(1,1, figsize=(12,10))
-fig.tight_layout(pad=4)
-bin_boundaries=np.arange(0,300,4)
-
-data_dict = {'IMERG': {'data': truth_array, 'histtype': 'stepfilled', 'alpha':0.6, 'facecolor': 'grey'}, 
-             'IFS': {'data': fcst_array, 'histtype': 'step', 'edgecolor': 'red'},
-             'IFS-qm': {'data': fcst_corrected, 'histtype': 'step', 'edgecolor': 'red', 'linestyle': '--'},
-             'cGAN': {'data': samples_gen_array[:,:,:,0], 'histtype': 'step', 'edgecolor': 'blue'},
-                'cGAN-qm': {'data': cgan_corrected[...,0], 'histtype': 'step', 'edgecolor': 'blue', 'linestyle': '--'}}
-rainfall_amounts = {}
-
-edge_colours = ["blue", "green", "red", 'orange']
-for n, (name, d) in enumerate(data_dict.items()):
-    
-    axs.hist(d['data'].flatten(), bins=bin_boundaries, histtype=d['histtype'], label=name, alpha=d.get('alpha'),
-                facecolor=d.get('facecolor'), edgecolor=d.get('edgecolor'), linestyle= d.get('linestyle'), linewidth=3)
-    
-axs.set_yscale('log')
-axs.legend()
-axs.set_xlabel('Rainfall (mm/hr)')
-axs.set_ylabel('Frequency of occurence')
-axs.set_xlim([0,150])
-axs.vlines(q_99pt99, 0, 10**8, linestyles='--', linewidth=3)
-axs.text(q_99pt99 + 7 , 10**7, '$99.99^{th}$')
-
-plt.savefig(os.path.join(plot_dir, f'histograms_{model_type}_{model_number}_{area}.pdf'), format='pdf', bbox_inches='tight')
-
-
-# %% [markdown]
 # ## Histograms comparing training and test data
 
 # %%
-area='all'
+area='kenya'
 latitude_range, lat_range_index, longitude_range, lon_range_index = get_area_range(data_config, area=area)
+
 
 # %%
 # Training data
@@ -761,12 +819,32 @@ train_obs_array = arrays['truth']
 training_dates = arrays['dates']
 
 train_obs_array = train_obs_array[:,lat_range_index[0]: lat_range_index[1]+1, lon_range_index[0]: lon_range_index[1]+1]
+
 del arrays
 
-relevant_ixs = [n for n, dt in enumerate(training_dates) if dt[0].month in (3,4,5)]
+mam_ixs = [n for n, dt in enumerate(training_dates) if dt[0].month in (3,4,5)]
 
-train_obs_array_mam = train_obs_array[relevant_ixs, :, :]
+train_obs_array_mam = train_obs_array[mam_ixs, :, :]
 
+
+# %%
+# Validation data
+
+with open('/user/work/uz22147/logs/cgan/7c4126e641f81ae0_medium-cl100-final-nologs/n2900_201806-201903_42e34_e20/arrays-217600.pkl', 'rb') as ifh:
+    arrays = pickle.load(ifh)
+
+val_obs_array = arrays['truth']
+val_dates = arrays['dates']
+
+val_obs_array = val_obs_array[:,lat_range_index[0]: lat_range_index[1]+1, lon_range_index[0]: lon_range_index[1]+1]
+
+del arrays
+
+
+# %%
+# Data from training that is in-between validation months
+relevant_training_dates = utils.date_range_from_year_month_range(model_config.train.training_range)
+in_between_date_ixs = [n for n, dt in enumerate(training_dates) if dt >= date(2018,7,1)]
 
 # %%
 # Normal testing period
@@ -811,81 +889,17 @@ bin_boundaries=np.arange(0,300,4)
 assert mam_2018_test_obs_array.shape[1:] == train_obs_array.shape[1:]
 
 data_dict = {
-             'IMERG train MAM': {'data': train_obs_array_mam, 'histtype': 'stepfilled', 'alpha':0.6, 'facecolor': 'grey'}, 
-             'IMERG test normal MAM': {'data': normal_test_obs_array_mam, 'histtype': 'step', 'edgecolor': 'blue'},
-             'IMERG test MAM 2018': {'data': mam_2018_test_obs_array, 'histtype': 'step', 'edgecolor': 'green', 'linestyle': '--'},
-             'IMERG test normal full': {'data': normal_test_obs_array, 'histtype': 'step', 'edgecolor': 'red', 'linestyle': '--'},
+    'IMERG train': {'data': train_obs_array, 'histtype': 'stepfilled', 'alpha':0.5, 'facecolor': 'grey'},
+    'IMERG validation': {'data': val_obs_array, 'histtype': 'step', 'edgecolor': 'k'},
+    'IMERG test': {'data': normal_test_obs_array, 'histtype': 'step', 'edgecolor': 'b'},
+    'IMERG MAM 2018': {'data': mam_2018_test_obs_array, 'histtype': 'step', 'edgecolor': 'g'}
+            #  'IMERG train MAM': {'data': train_obs_array_mam, 'histtype': 'stepfilled', 'alpha':0.6, 'facecolor': 'grey'}, 
+            #  'IMERG test normal MAM': {'data': normal_test_obs_array_mam, 'histtype': 'step', 'edgecolor': 'blue'},
+            #  'IMERG test MAM 2018': {'data': mam_2018_test_obs_array, 'histtype': 'step', 'edgecolor': 'green', 'linestyle': '--'},
+            #  'IMERG test normal full': {'data': normal_test_obs_array, 'histtype': 'step', 'edgecolor': 'red', 'linestyle': '--'},
              }
 rainfall_amounts = {}
 
-edge_colours = ["blue", "green", "red", 'orange']
-for n, (name, d) in enumerate(data_dict.items()):
-    
-    axs.hist(d['data'].flatten(), bins=bin_boundaries, histtype=d['histtype'], label=name, alpha=d.get('alpha'),
-                facecolor=d.get('facecolor'), edgecolor=d.get('edgecolor'), linestyle= d.get('linestyle'), linewidth=3, density=True)
-    
-axs.set_yscale('log')
-axs.legend()
-axs.set_xlabel('Rainfall (mm/hr)')
-axs.set_ylabel('Frequency of occurence')
-axs.set_xlim([0,150])
-
-# plot_fp = os.path.join(plot_dir, f'histograms_train_obs_comparison_{model_type}_{model_number}_{area}.pdf')
-# plt.savefig(plot_fp, format='pdf', bbox_inches='tight')
-
-# %%
-from itertools import chain
-
-(q_99pt9, q_99pt99) = np.quantile(truth_array, [0.999, 0.9999])
-
-plt.rcParams.update({'font.size': 20})
-
-fig, axs = plt.subplots(1,1, figsize=(12,10))
-fig.tight_layout(pad=4)
-bin_boundaries=np.arange(0,300,4)
-
-assert truth_array.shape[1:] == train_obs_array.shape[1:]
-
-data_dict = {'IFS test': {'data': fcst_array, 'histtype': 'stepfilled', 'alpha':0.6, 'facecolor': 'grey'}, 
-             'IFS train MAM': {'data': train_fcst_array_mam, 'histtype': 'step', 'edgecolor': 'red'},
-             'IFS train': {'data': train_fcst_array, 'histtype': 'step', 'edgecolor': 'red', 'linestyle': '--'}}
-rainfall_amounts = {}
-
-edge_colours = ["blue", "green", "red", 'orange']
-for n, (name, d) in enumerate(data_dict.items()):
-    
-    axs.hist(d['data'].flatten(), bins=bin_boundaries, histtype=d['histtype'], label=name, alpha=d.get('alpha'),
-                facecolor=d.get('facecolor'), edgecolor=d.get('edgecolor'), linestyle= d.get('linestyle'), linewidth=3, density=True)
-    
-axs.set_yscale('log')
-axs.legend()
-axs.set_xlabel('Rainfall (mm/hr)')
-axs.set_ylabel('Frequency of occurence')
-axs.set_xlim([0,150])
-
-plot_fp = os.path.join(plot_dir, f'histograms_train_ifs_comparison_{model_type}_{model_number}_{area}.pdf')
-plt.savefig(plot_fp, format='pdf', bbox_inches='tight')
-
-# %%
-from itertools import chain
-
-(q_99pt9, q_99pt99) = np.quantile(truth_array, [0.999, 0.9999])
-
-plt.rcParams.update({'font.size': 20})
-
-fig, axs = plt.subplots(1,1, figsize=(12,10))
-fig.tight_layout(pad=4)
-bin_boundaries=np.arange(0,300,4)
-
-assert truth_array.shape[1:] == train_obs_array.shape[1:]
-
-data_dict = {'IMERG test': {'data': truth_array, 'histtype': 'stepfilled', 'alpha':0.6, 'facecolor': 'grey'}, 
-             'IMERG train MAM': {'data': train_obs_array_mam, 'histtype': 'step', 'edgecolor': 'black'},
-             'IMERG train': {'data': train_obs_array, 'histtype': 'step', 'edgecolor': 'black', 'linestyle': '--'},
-             }
-rainfall_amounts = {}
-
-edge_colours = ["blue", "green", "red", 'orange']
 for n, (name, d) in enumerate(data_dict.items()):
     
     axs.hist(d['data'].flatten(), bins=bin_boundaries, histtype=d['histtype'], label=name, alpha=d.get('alpha'),
@@ -900,6 +914,44 @@ axs.set_xlim([0,150])
 plot_fp = os.path.join(plot_dir, f'histograms_train_obs_comparison_{model_type}_{model_number}_{area}.pdf')
 plt.savefig(plot_fp, format='pdf', bbox_inches='tight')
 
+# %%
+from itertools import chain
+
+(q_99pt9, q_99pt99) = np.quantile(truth_array, [0.999, 0.9999])
+
+plt.rcParams.update({'font.size': 20})
+
+fig, axs = plt.subplots(1,1, figsize=(12,10))
+fig.tight_layout(pad=4)
+bin_boundaries=np.arange(0,300,4)
+
+assert mam_2018_test_obs_array.shape[1:] == train_obs_array.shape[1:]
+
+data_dict = {
+    'IMERG train MAM': {'data': train_obs_array, 'histtype': 'stepfilled', 'alpha':0.5, 'facecolor': 'grey'},
+    'IMERG test MAM': {'data': normal_test_obs_array, 'histtype': 'step', 'edgecolor': 'b'},
+    'IMERG MAM 2018': {'data': mam_2018_test_obs_array, 'histtype': 'step', 'edgecolor': 'g'}
+            #  'IMERG train MAM': {'data': train_obs_array_mam, 'histtype': 'stepfilled', 'alpha':0.6, 'facecolor': 'grey'}, 
+            #  'IMERG test normal MAM': {'data': normal_test_obs_array_mam, 'histtype': 'step', 'edgecolor': 'blue'},
+            #  'IMERG test MAM 2018': {'data': mam_2018_test_obs_array, 'histtype': 'step', 'edgecolor': 'green', 'linestyle': '--'},
+            #  'IMERG test normal full': {'data': normal_test_obs_array, 'histtype': 'step', 'edgecolor': 'red', 'linestyle': '--'},
+             }
+rainfall_amounts = {}
+
+for n, (name, d) in enumerate(data_dict.items()):
+    
+    axs.hist(d['data'].flatten(), bins=bin_boundaries, histtype=d['histtype'], label=name, alpha=d.get('alpha'),
+                facecolor=d.get('facecolor'), edgecolor=d.get('edgecolor'), linestyle= d.get('linestyle'), linewidth=3, density=True)
+    
+axs.set_yscale('log')
+axs.legend()
+axs.set_xlabel('Rainfall (mm/hr)')
+axs.set_ylabel('Frequency of occurence')
+axs.set_xlim([0,150])
+
+plot_fp = os.path.join(plot_dir, f'histograms_MAM_comparison_{model_type}_{model_number}_{area}.pdf')
+plt.savefig(plot_fp, format='pdf', bbox_inches='tight')
+
 # %% [markdown]
 # ### Bias
 
@@ -912,12 +964,34 @@ bias_std_dict = {'cGAN-qm': np.std(cgan_corrected[...,0], axis=0) - np.std(truth
             'IFS-qm' : np.std(fcst_corrected, axis=0) - np.std(truth_array,axis=0)}
 
 # %%
+np.mean(cgan_corrected[0,:,:,0])
+
+# %%
+# Domain averaged biases
+
+domain_rainfall_obs = np.array([np.mean(truth_array[n,...]) for n in range(truth_array.shape[0])])
+domain_rainfall_cgan = np.array([np.mean(cgan_corrected[n,...,0]) for n in range(truth_array.shape[0])])
+domain_rainfall_ifs = np.array([np.mean(fcst_corrected[n,...]) for n in range(truth_array.shape[0])])
+
+print(f'Domain averaged bias cGAN: {np.mean(domain_rainfall_cgan - domain_rainfall_obs)}')
+print(f'Domain averaged bias IFS: {np.mean(domain_rainfall_ifs - domain_rainfall_obs)}')
+
+# %%
+domain_rainfall_obs.shape
+
+# %%
 bias_summary_stats = {}
 for k in bias_dict.keys():
     
     bias_summary_stats['rms_bias'] = np.sqrt(np.power(bias_dict[k],2).mean())
     bias_summary_stats['rms_std_bias'] = np.sqrt(np.power(bias_std_dict[k],2).mean())
 print(bias_summary_stats)
+
+# %%
+cgan_corrected[relevant_ixs,:,:,0].shape
+
+# %%
+[np.round(item, 2) for item in np.arange(-max_cbar_val, max_cbar_val, 0.1)]
 
 # %%
 lat_range=latitude_range
@@ -927,23 +1001,31 @@ plt.rcParams.update({'font.size': 12})
 num_rows = 2
 num_cols =2
 
+hr_start = 0
+hr_end = 6
+hour_range = np.arange(hr_start, hr_end)
+relevant_ixs = [n for n, h in enumerate(hours) if h in hour_range]
+
+
 fig = plt.figure(constrained_layout=True, figsize=(1.5*2.5*num_cols, 1.5*3*num_rows))
 gs = gridspec.GridSpec(num_rows + 2, num_cols, figure=fig, 
                        height_ratios=[1, 0.05, 1, 0.05],
-                       wspace=0.005)   
-bias_dict = {'cGAN-qm': np.mean(cgan_corrected[...,0] - truth_array, axis=0),
-            'IFS-qm' : np.mean(fcst_corrected - truth_array, axis=0)}
-val_range = list(np.arange(-0.75, 0.755, 0.05))
+                       wspace=0.005)
+bias_dict = {'cGAN-qm': np.mean(cgan_corrected[relevant_ixs,:,:,0] - truth_array[relevant_ixs,:,:], axis=0),
+            'IFS-qm' : np.mean(fcst_corrected[relevant_ixs,:,:] - truth_array[relevant_ixs,:,:], axis=0)}
 
 max_bias_val = max([v.max() for v in bias_dict.values()])
 min_bias_val = min([v.min() for v in bias_dict.values()])
+
+max_cbar_val = 0.3
+value_range = list(np.arange(-max_cbar_val, max_cbar_val + 0.01, 0.01))
+cbar_tick_vals = [np.round(item, 2) for item in np.arange(-max_cbar_val, max_cbar_val + 0.01, 0.1)]
 
 for col, (k,v) in enumerate(bias_dict.items()):
 
     ax = fig.add_subplot(gs[0, col], projection = ccrs.PlateCarree())
 
-    value_range = list(np.arange(-0.5, 0.5, 0.01))
-
+    
     #remove edges
     edge_len =5
 
@@ -953,11 +1035,9 @@ for col, (k,v) in enumerate(bias_dict.items()):
                        title=title, 
                        ax=ax,
                        cmap='BrBG', 
-                       value_range=val_range, 
+                       value_range=value_range, 
                        lat_range=latitude_range,
                        lon_range=longitude_range # There is a bug somewhere in how the arrays are produced
-                    #    lat_range=latitude_range[edge_len:-edge_len], 
-                    #    lon_range=longitude_range[edge_len:-edge_len]
                        )
     lon_ticks = np.arange(25, 50,10)
     lat_ticks = np.arange(-10, 15,10)
@@ -965,10 +1045,12 @@ for col, (k,v) in enumerate(bias_dict.items()):
     ax.set_yticks(lat_ticks)
     ax.set_xticklabels([f'{ln}E' for ln in lon_ticks])
     ax.set_yticklabels([f"{np.abs(lt)}{'N' if lt >=0 else 'S'}" for lt in lat_ticks])
+
 cbar_ax = fig.add_subplot(gs[1, :])
 cb = fig.colorbar(im, cax=cbar_ax, orientation='horizontal', shrink = 0.2, aspect=10,
                   )
-
+cb.ax.set_xticks(cbar_tick_vals)
+cb.ax.set_xticklabels(cbar_tick_vals)
 cb.ax.set_xlabel("Average bias (mm/hr)", loc='center')
 
 # Standard deviation bias
@@ -978,7 +1060,7 @@ for col, (k,v) in enumerate(bias_std_dict.items()):
 
     ax = fig.add_subplot(gs[2, col], projection = ccrs.PlateCarree())
 
-    value_range = None
+    value_range = list(np.arange(-0.75, 0.755, 0.05))
 
     title = f'{k} ({np.sqrt(np.power(bias_std_dict[k],2).mean()):0.2f})'
 
@@ -988,7 +1070,7 @@ for col, (k,v) in enumerate(bias_std_dict.items()):
                        title=title, 
                        ax=ax,
                        cmap='BrBG', 
-                       value_range=val_range, 
+                       value_range=value_range, 
                        lat_range=latitude_range,
                        lon_range=longitude_range
 
@@ -1006,8 +1088,76 @@ cb = fig.colorbar(im, cax=cbar_ax, orientation='horizontal', shrink = 0.2, aspec
 
 cb.ax.set_xlabel("Standard Deviation Bias (mm/hr)", loc='center')
 
-plot_filename = os.path.join(plot_dir, f'bias_{model_type}{model_number}_{area}.pdf')
+plot_filename = os.path.join(plot_dir, f'bias_hr{hr_start}-{hr_end}_{model_type}{model_number}_{area}.pdf')
 plt.savefig(plot_filename, format='pdf', bbox_inches='tight')
+
+# %%
+# Loop over hour intervals
+
+interval = 6
+hour_ranges = [(interval*n,interval*(n+1)) for n in range(int(24/interval))]
+
+num_rows = len(hour_ranges)
+num_cols = 2
+
+# Hour filtering
+fig = plt.figure(constrained_layout=True, figsize=(1.5*2.5*num_cols, 1.5*3*num_rows))
+gs = gridspec.GridSpec(num_rows + 1, num_cols, figure=fig, 
+                    height_ratios=[1]*num_rows + [0.05],
+                    wspace=0.005)
+
+for m, (hr_start, hr_end) in enumerate(hour_ranges):
+
+
+    relevant_ixs = [n for n, h in enumerate(hours) if h in np.arange(hr_start, hr_end)]
+    
+    bias_dict = {'cGAN-qm': np.mean(cgan_corrected[relevant_ixs,:,:,0] - truth_array[relevant_ixs,:,:], axis=0),
+                'IFS-qm' : np.mean(fcst_corrected[relevant_ixs,:,:] - truth_array[relevant_ixs,:,:], axis=0)}
+
+    max_bias_val = max([v.max() for v in bias_dict.values()])
+    min_bias_val = min([v.min() for v in bias_dict.values()])
+
+    max_cbar_val = 0.5
+    value_range = list(np.arange(-max_cbar_val, max_cbar_val + 0.01, 0.01))
+    cbar_tick_vals = [np.round(item, 2) for item in np.arange(-max_cbar_val, max_cbar_val + 0.01, 0.1)]
+
+    for col, (k,v) in enumerate(bias_dict.items()):
+
+        ax = fig.add_subplot(gs[m, col], projection = ccrs.PlateCarree())
+
+        #remove edges
+        edge_len =5
+
+        title = f'{k} {hr_start:02d}-{hr_end:02d}h ({np.sqrt(np.power(bias_dict[k],2).mean()):0.2f})'
+
+        im = plot_contourf(v, 
+                        title=title, 
+                        ax=ax,
+                        cmap='BrBG', 
+                        value_range=value_range, 
+                        lat_range=latitude_range,
+                        lon_range=longitude_range 
+                        )
+        lon_ticks = np.arange(25, 50,10)
+        lat_ticks = np.arange(-10, 15,10)
+        ax.set_xticks(lon_ticks)
+        ax.set_yticks(lat_ticks)
+        ax.set_xticklabels([f'{ln}E' for ln in lon_ticks])
+        ax.set_yticklabels([f"{np.abs(lt)}{'N' if lt >=0 else 'S'}" for lt in lat_ticks])
+
+cbar_ax = fig.add_subplot(gs[-1, :])
+cb = fig.colorbar(im, cax=cbar_ax, orientation='horizontal', shrink = 0.2, aspect=10,
+                )
+cb.ax.set_xticks(cbar_tick_vals)
+cb.ax.set_xticklabels(cbar_tick_vals)
+cb.ax.set_xlabel("Average bias (mm/hr)", loc='center')
+
+
+plot_filename = os.path.join(plot_dir, f'bias_hour_ranges_{model_type}{model_number}_{area}.pdf')
+plt.savefig(plot_filename, format='pdf', bbox_inches='tight')
+
+# %%
+plot_filename
 
 # %% [markdown]
 # # Fractions skill score
@@ -1233,6 +1383,9 @@ for n, metric_name in enumerate(['mean', 'quantile_999', 'quantile_9999']):
 plt.savefig(os.path.join(plot_dir,f'diurnal_cycle_{model_type}_{model_number}.pdf'), bbox_inches='tight')
 
 # %%
+print(os.path.join(plot_dir,f'diurnal_cycle_{model_type}_{model_number}.pdf'))
+
+# %%
 
 format_lkp = {'cGAN': {'color': 'b', 'label': 'cGAN-qm'}, 'IFS': {'color': 'r', 'label': 'IFS-qm'}, 'Obs (IMERG)': {'label': 'IMERG'}}
 plt.rcParams.update({'font.size': 15})
@@ -1278,6 +1431,9 @@ lines, labels = [sum(lol, []) for lol in zip(*lines_labels)]
 # fig.legend(lines, labels, loc='center right', ncol=3)
 
 plt.savefig(os.path.join(plot_dir,f'diurnal_cycle_{model_type}_{model_number}_subdomains.pdf'), bbox_inches='tight')
+
+# %%
+os.path.join(plot_dir,f'diurnal_cycle_{model_type}_{model_number}_subdomains.pdf')
 
 # %%
 
@@ -1361,46 +1517,15 @@ for metric_name, diurnal_dict in diurnal_results.items():
 
     plt.savefig(os.path.join(plot_dir,f'diurnal_cycle_{metric_name}_{model_type}_{model_number}.pdf'), bbox_inches='tight')
 
-# %%
-os.path.join(plot_dir,f'diurnal_cycle_{metric_name}_{model_type}_{model_number}.pdf')
-
 
 # %%
-# function to locate peak rainfall
+def get_peak_rainfall_hour_bin(arr, longitude_range, latitude_range, hours, hour_interval=1, time_filter_length=1):
 
-def get_peak_rainfall_hour_bin(array, hours, bin_width=1):
-    metric_fn = lambda x,y: np.mean(x)
+    hour_bin_edges = np.arange(0, 24, hour_interval)
+    digitized_hours = np.digitize(hours, bins=hour_bin_edges)
 
-    metric_by_hour, hour_bin_edges = get_metric_by_hour(metric_fn, array, array, hours, bin_width=bin_width)
-    max_time_bin = np.argmax(np.array(list(metric_by_hour.values())))
-    
-    return max_time_bin
-
-
-
-# %%
-# Diurnal maximum map
-import xarray as xr
-from datetime import datetime
-from dsrnngan.utils.utils import get_local_hour
-from scipy.ndimage import uniform_filter, uniform_filter1d
-import xarray as xr
-
-hour_bin_edges = np.arange(0, 24, 1)
-filter_size = 31 # roughly the size of lake victoria region
-digitized_hours = np.digitize(hours, bins=hour_bin_edges)
-
-n_samples = truth_array.shape[0]
-raw_diurnal_data_dict = {'IMERG': truth_array,
-                         'cGAN-qm':cgan_corrected[:,:,:,0],
-                         'IFS-qm': fcst_corrected}
-
-peak_dict = {}
-
-for name in raw_diurnal_data_dict:
-    
     da = xr.DataArray(
-        data=raw_diurnal_data_dict[name],
+        data=arr,
         dims=["hour_range", "lat", "lon"],
         coords=dict(
             lon=(longitude_range),
@@ -1414,8 +1539,64 @@ for name in raw_diurnal_data_dict:
     )
 
 
-    smoothed_vals = uniform_filter1d(da.groupby('hour_range').mean().values, 3, axis=0, mode='wrap')
-    peak_dict[name] = np.argmax(smoothed_vals, axis=0)
+    grouped_data = da.groupby('hour_range').mean()
+
+    smoothed_vals = uniform_filter1d(grouped_data.values, time_filter_length, axis=0, mode='wrap')
+    return np.argmax(smoothed_vals, axis=0)
+
+# %%
+# Diurnal maximum map
+import xarray as xr
+from datetime import datetime
+from dsrnngan.utils.utils import get_local_hour
+from scipy.ndimage import uniform_filter, uniform_filter1d
+import xarray as xr
+
+hour_bin_edges = np.arange(0, 24, 1)
+digitized_hours = np.digitize(hours, bins=hour_bin_edges)
+
+n_samples = truth_array.shape[0]
+raw_diurnal_data_dict = {'IMERG': truth_array,
+                         'cGAN-qm':cgan_corrected[:,:,:,0],
+                         'IFS-qm': fcst_corrected}
+
+avg_max_rainfall_dict = {}
+
+for name in raw_diurnal_data_dict:
+    
+    max_rainfall_hour_array = []
+    for d in tqdm(set(dates)):
+        relevant_ixs = [n for n, dt in enumerate(dates) if dt == d]
+        tmp_array = truth_array[relevant_ixs,...]
+        max_rainfall_hour_array.append(np.argmax(tmp_array, axis=0))
+    max_rainfall_hour_array = np.stack(max_rainfall_hour_array)
+
+    avg_max_rainfall_dict[name] = np.mean(max_rainfall_hour_array, axis=0)
+
+# %%
+# Diurnal maximum map
+import xarray as xr
+from datetime import datetime
+from dsrnngan.utils.utils import get_local_hour
+from scipy.ndimage import uniform_filter, uniform_filter1d
+import xarray as xr
+
+min_hour_val = 1
+max_hour_val = 24
+n_samples = truth_array.shape[0]
+raw_diurnal_data_dict = {'IMERG': truth_array,
+                         'cGAN-qm':cgan_corrected[:,:,:,0],
+                         'IFS-qm': fcst_corrected}
+
+peak_dict = {}
+
+
+for name in raw_diurnal_data_dict:
+    
+    peak_dict[name] = get_peak_rainfall_hour_bin(raw_diurnal_data_dict[name], 
+                                                longitude_range, latitude_range, hours, 
+                                                hour_interval=1, time_filter_length=3, hour_range=range(min_hour_val, 25))
+
 
 
 # %%
@@ -1436,22 +1617,25 @@ gs = gridspec.GridSpec(n_rows + 1, n_cols, figure=fig,
                 wspace=0.005) 
 
 
-filter_size=11
-min_bias_val = -12
-max_bias_val = 12
+filter_size=5
+min_bias_val = -(max_hour_val - min_hour_val)
+max_bias_val = (max_hour_val - min_hour_val)
 
 # Get observation map first to allow differencing
 ax = fig.add_subplot(gs[0, 0], projection = ccrs.PlateCarree())
 imerg_peak_data = peak_dict['IMERG']
+
 smoothed_imerg_peak_data = uniform_filter(imerg_peak_data.copy(), size=filter_size, mode='reflect')
-im_imerg = ax.imshow(np.flip(smoothed_imerg_peak_data, axis=0), extent = [ min(longitude_range), max(longitude_range), 
+
+# Note: removed smoothing of IMERG, since it obscures the colors in the plot
+im_imerg = ax.imshow(np.flip(imerg_peak_data, axis=0), extent = [ min(longitude_range), max(longitude_range), 
                                                                           min(latitude_range), max(latitude_range)], 
-                transform=ccrs.PlateCarree(), cmap='twilight_shifted', vmin=0, vmax=23)
+                transform=ccrs.PlateCarree(), cmap='twilight_shifted', vmin=0, vmax=24)
 ax.add_feature(plots.border_feature)
 ax.add_feature(plots.disputed_border_feature)
 ax.add_feature(plots.lake_feature, alpha=0.4)
 ax.coastlines(resolution='10m', color='black', linewidth=0.4)
-ax.set_title('IMERG')
+ax.set_title('(a) IMERG')
 
 lon_ticks = np.arange(25, 50,10)
 lat_ticks = np.arange(-10, 15,10)
@@ -1459,39 +1643,12 @@ ax.set_xticks(lon_ticks)
 ax.set_yticks(lat_ticks)
 ax.set_xticklabels([f'{ln}E' for ln in lon_ticks])
 ax.set_yticklabels([f"{lt}{'N' if lt >0 else 'N'}" for lt in lat_ticks])
-n=1
-# for name, peak_data in peak_dict.items():
-#     if name != 'IMERG':
-#         ax = fig.add_subplot(gs[0, n], projection = ccrs.PlateCarree())
-#         smoothed_peak_data = uniform_filter(peak_data.copy(), size=filter_size, mode='reflect')
-
-#         im1 = ax.imshow(np.flip(smoothed_peak_data, axis=0), extent = [ min(longitude_range), max(longitude_range), min(latitude_range), max(latitude_range)], 
-#                 transform=ccrs.PlateCarree(),
-#                 cmap='twilight_shifted', vmin=0, vmax=23)
-        
-#         n+=1
-
-#     ax.add_feature(plots.border_feature)
-#     ax.add_feature(plots.disputed_border_feature)
-#     ax.add_feature(plots.lake_feature, alpha=0.4)
-#     ax.coastlines(resolution='10m', color='black', linewidth=0.4)
-#     ax.set_title(f'{name}')
-
-#     lon_ticks = np.arange(25, 50,10)
-#     lat_ticks = np.arange(-10, 15,10)
-#     ax.set_xticks(lon_ticks)
-#     ax.set_yticks(lat_ticks)
-#     ax.set_xticklabels([f'{ln}E' for ln in lon_ticks])
-#     ax.set_yticklabels([f"{np.abs(lt)}{'N' if lt >=0 else 'S'}" for lt in lat_ticks])
-
-    
         
 cbar_ax_time = fig.add_subplot(gs[1, 0])
-# cb = fig.colorbar(cm.ScalarMappable(norm=None, cmap=colors.Colormap('twilight_shifted')), cax=cbar_ax, orientation='horizontal', shrink = 0.2, aspect=10, ticks=range(len(hour_bin_edges)))
-cb_time = fig.colorbar(im_imerg, cax=cbar_ax_time, orientation='horizontal', shrink = 0.2, aspect=10, ticks=range(len(hour_bin_edges)),
-                    )
-cb_time.ax.set_xticks(range(0,24,3))
-cb_time.ax.set_xticklabels(range(0,24,3))
+
+cb_time = fig.colorbar(im_imerg, cax=cbar_ax_time, orientation='horizontal', shrink = 0.2, aspect=10, ticks=range(min_hour_val, max_hour_val))
+cb_time.ax.set_xticks(range(0,25,3))
+cb_time.ax.set_xticklabels(range(0,25,3))
 cb_time.ax.set_xlabel("Peak rainfall hour (EAT)", loc='center')
 
 
@@ -1523,14 +1680,12 @@ for name, peak_data in peak_dict.items():
         im1 = ax.imshow(np.flip(smoothed_peak_data_diff, axis=0),
                         extent = [ min(longitude_range), max(longitude_range), min(latitude_range), max(latitude_range)], 
                 transform=ccrs.PlateCarree(), cmap=cm, vmin=min_bias_val, vmax=max_bias_val)
-        
-        n+=1
 
         ax.add_feature(plots.border_feature)
         ax.add_feature(plots.disputed_border_feature)
         ax.add_feature(plots.lake_feature, alpha=0.4)
         ax.coastlines(resolution='10m', color='black', linewidth=0.4)
-        ax.set_title(f'{name} - IMERG')
+        ax.set_title(f'({ascii_lowercase[n]}) {name} - IMERG')
 
         lon_ticks = np.arange(25, 50,10)
         lat_ticks = np.arange(-10, 15,10)
@@ -1538,288 +1693,103 @@ for name, peak_data in peak_dict.items():
         ax.set_yticks(lat_ticks)
         ax.set_xticklabels([f'{ln}E' for ln in lon_ticks])
         ax.set_yticklabels([f"{np.abs(lt)}{'N' if lt >=0 else 'S'}" for lt in lat_ticks])
-
+        n+=1
     
 cbar_ax_bias = fig.add_subplot(gs[-1, 1:3])
 
 
-cb_bias = fig.colorbar(im1, cax=cbar_ax_bias, orientation='horizontal', shrink = 0.2, aspect=10, ticks=np.arange(min_bias_val, max_bias_val+0.1, 2),
+cb_bias = fig.colorbar(im1, cax=cbar_ax_bias, orientation='horizontal', shrink = 0.2, aspect=10, ticks=np.arange(min_bias_val, max_bias_val+0.1, 3),
                     )
 cb_bias.ax.set_xlabel("Peak rainfall hour bias (hours)", loc='center')
-# cb_time.ax.set_xticks(range(0,24,3))
-# cb_time.ax.set_xticklabels(np.arange(min_bias_val, max_bias_val, 2))
-fp = os.path.join(plot_dir, f"diurnal_cycle_map_{area.replace(' ', '_')}_{model_type}_{model_number}.pdf")
+fp = os.path.join(plot_dir, f"diurnal_cycle_map_{min_hour_val}-{max_hour_val}_{area.replace(' ', '_')}_{model_type}_{model_number}.pdf")
 print(fp)
 plt.savefig(fp, format='pdf', bbox_inches='tight')
 
 
 # %%
-
-from dsrnngan.evaluation import plots
-from matplotlib.pyplot import cm
-from matplotlib import colors
-from matplotlib.colors import LinearSegmentedColormap
-
-
-plt.rcParams.update({'font.size': 9})
-
-n_cols = len(peak_dict)
-n_rows = 1
+interval = 6
+hour_ranges = [(interval*n,interval*(n+1)) for n in range(int(24/interval))]
+n_cols = 2
+n_rows = len(hour_ranges)
 fig = plt.figure(constrained_layout=True, figsize=(2.5*n_cols, 3*n_rows))
 gs = gridspec.GridSpec(n_rows + 1, n_cols, figure=fig, 
                     width_ratios=[1]*(n_cols ),
-                    height_ratios=[1]*(n_rows) + [0.05],
+                    height_ratios=[1]*n_rows + [0.05],
                 wspace=0.005) 
 
 
-filter_size=5
-min_bias_val = -12
-max_bias_val = 12
+for m, (min_hour_val, max_hour_val) in enumerate(hour_ranges):
 
-colors = [(1, 0, 0), (1,1,1), (0, 0, 1)]
-cm = LinearSegmentedColormap.from_list(
-          'text', colors, N=24)
+    relevant_ixs = [jj for jj,h in enumerate(hours) if h in range(min_hour_val,max_hour_val)]
+    hour_subset = [h for h in hours if h in range(min_hour_val,max_hour_val)]
+    n_samples = truth_array.shape[0]
+    raw_diurnal_data_dict = {'IMERG': truth_array[relevant_ixs,...],
+                            'cGAN-qm':cgan_corrected[relevant_ixs,:,:,0],
+                            'IFS-qm': fcst_corrected[relevant_ixs,...]}
 
-# Get observation map first to allow differencing
-ax = fig.add_subplot(gs[0, 0], projection = ccrs.PlateCarree())
-imerg_peak_data = peak_dict['IMERG']
-smoothed_imerg_peak_data = uniform_filter(imerg_peak_data.copy(), size=filter_size, mode='reflect')
-im_imerg = ax.imshow(np.flip(smoothed_imerg_peak_data, axis=0),
-                     extent = [ min(longitude_range), max(longitude_range), 
-                               min(latitude_range), max(latitude_range)], 
-                transform=ccrs.PlateCarree(), cmap='twilight_shifted', vmin=0, vmax=23)
-ax.add_feature(plots.border_feature)
-ax.add_feature(plots.disputed_border_feature)
-ax.add_feature(plots.lake_feature, alpha=0.4)
-ax.coastlines(resolution='10m', color='black', linewidth=0.4)
-ax.set_title('IMERG')
+    peak_dict = {}
+    for name in raw_diurnal_data_dict:
+        
+        peak_dict[name] = get_peak_rainfall_hour_bin(raw_diurnal_data_dict[name], 
+                                                    longitude_range, latitude_range, hour_subset, 
+                                                    hour_interval=1, time_filter_length=1) 
 
-lon_ticks = np.arange(25, 50,10)
-lat_ticks = np.arange(-10, 15,10)
-ax.set_xticks(lon_ticks)
-ax.set_yticks(lat_ticks)
-ax.set_xticklabels([f'{ln}E' for ln in lon_ticks])
-ax.set_yticklabels([f"{lt}{'N' if lt >0 else 'N'}" for lt in lat_ticks])
-n=1
-for name, peak_data in peak_dict.items():
-    if name != 'IMERG':
-        ax = fig.add_subplot(gs[0, n], projection = ccrs.PlateCarree())
+    #######################  
+    # 
+    ########################                                             
+    
+
+
+    filter_size=5
+    min_bias_val = -(max_hour_val - min_hour_val)
+    max_bias_val = (max_hour_val - min_hour_val)
+
+    # Get observation map first to allow differencing
+    imerg_peak_data = peak_dict['IMERG']
+
+    forecast_dict = {k:v for k,v in peak_dict.items() if k != 'IMERG'}
+    for n, (name, peak_data) in enumerate(forecast_dict.items()):
+
+        ax = fig.add_subplot(gs[m, n], projection = ccrs.PlateCarree())
         
         data_diff = (peak_data - imerg_peak_data)
+
         data_diff[data_diff > 12] = 24 - data_diff[data_diff > 12]
         data_diff[data_diff < -12] = 24 + data_diff[data_diff < -12] 
-        
+        print('**', name)
+        print('Overall bias: ', data_diff.mean())
+        print('Overall bias over land: ', data_diff[lsm > 0.5].mean())
+        print('Overall bias over sea (excluding LV): ', data_diff[lsm_ocean < 0.5].mean())
+        print('Overall bias over LV (lake only): ', data_diff[lv_lsm == 1].mean())
+        print('Overall bias over LV (square box): ', data_diff[lv_area == 1].mean())
         smoothed_peak_data_diff = uniform_filter(data_diff.copy(), size=filter_size, mode='reflect')
         # Account for cyclical nature of hours
 
         im1 = ax.imshow(np.flip(smoothed_peak_data_diff, axis=0),
                         extent = [ min(longitude_range), max(longitude_range), min(latitude_range), max(latitude_range)], 
                 transform=ccrs.PlateCarree(), cmap=cm, vmin=min_bias_val, vmax=max_bias_val)
+
+        ax.add_feature(plots.border_feature)
+        ax.add_feature(plots.disputed_border_feature)
+        ax.add_feature(plots.lake_feature, alpha=0.4)
+        ax.coastlines(resolution='10m', color='black', linewidth=0.4)
+        ax.set_title(f'({ascii_lowercase[m*n_cols +n]}) {name} - IMERG ({min_hour_val:02d}-{max_hour_val:02d})')
+
+        lon_ticks = np.arange(25, 50,10)
+        lat_ticks = np.arange(-10, 15,10)
+        ax.set_xticks(lon_ticks)
+        ax.set_yticks(lat_ticks)
+        ax.set_xticklabels([f'{ln}E' for ln in lon_ticks])
+        ax.set_yticklabels([f"{np.abs(lt)}{'N' if lt >=0 else 'S'}" for lt in lat_ticks])
         
-        n+=1
 
-    ax.add_feature(plots.border_feature)
-    ax.add_feature(plots.disputed_border_feature)
-    ax.add_feature(plots.lake_feature, alpha=0.4)
-    ax.coastlines(resolution='10m', color='black', linewidth=0.4)
-    ax.set_title(f'{name} - IMERG')
-
-    lon_ticks = np.arange(25, 50,10)
-    lat_ticks = np.arange(-10, 15,10)
-    ax.set_xticks(lon_ticks)
-    ax.set_yticks(lat_ticks)
-    ax.set_xticklabels([f'{ln}E' for ln in lon_ticks])
-    ax.set_yticklabels([f"{np.abs(lt)}{'N' if lt >=0 else 'S'}" for lt in lat_ticks])
-
-    
-        
-cbar_ax_time = fig.add_subplot(gs[-1, 0])
-cbar_ax_bias = fig.add_subplot(gs[-1, 1:3])
-# cb = fig.colorbar(cm.ScalarMappable(norm=None, cmap=colors.Colormap('twilight_shifted')), cax=cbar_ax, orientation='horizontal', shrink = 0.2, aspect=10, ticks=range(len(hour_bin_edges)))
-cb_time = fig.colorbar(im_imerg, cax=cbar_ax_time, orientation='horizontal', shrink = 0.2, aspect=10, ticks=range(len(hour_bin_edges)),
-                    )
-cb_time.ax.set_xticks(range(0,24,3))
-cb_time.ax.set_xticklabels(range(0,24,3))
-cb_time.ax.set_xlabel("Peak rainfall hour (EAT)", loc='center')
-
+cbar_ax_bias = fig.add_subplot(gs[-1, 0:2])
 cb_bias = fig.colorbar(im1, cax=cbar_ax_bias, orientation='horizontal', shrink = 0.2, aspect=10, ticks=np.arange(min_bias_val, max_bias_val+0.1, 2),
                     )
-cb_bias.ax.set_xlabel("Peak rainfall bias (hours)", loc='center')
-# cb_time.ax.set_xticks(range(0,24,3))
-# cb_time.ax.set_xticklabels(np.arange(min_bias_val, max_bias_val, 2))
-fp = os.path.join(plot_dir, f"diurnal_cycle_map_{area.replace(' ', '_')}_{model_type}_{model_number}.pdf")
+cb_bias.ax.set_xlabel("Peak rainfall hour bias (hours)", loc='center')
+fp = os.path.join(plot_dir, f"diurnal_cycle_map_intervals_{area.replace(' ', '_')}_{model_type}_{model_number}.pdf")
 print(fp)
 plt.savefig(fp, format='pdf', bbox_inches='tight')
-
-# %%
-# Peak local time of rainfall
-
-fig, ax = plt.subplots(1,1)
-smoothed_diurnal_data_dict = {'Obs (IMERG)': truth_array,
-                    'GAN': cgan_corrected[:n_samples,:,:,0],
-                    'Fcst': fcst_corrected[:n_samples, :,:]}
-
-for name, arr in smoothed_diurnal_data_dict.items():
-    if name != 'Obs (IMERG)':
-        metric_by_hour, hour_bin_edges = get_metric_by_hour(mse, obs_array=truth_array, fcst_array=arr, hours=hours, bin_width=3)
-        ax.plot(metric_by_hour.keys(), metric_by_hour.values(), label=name)
-        ax.set_xticks(np.array(list(metric_by_hour.keys())) - .5)
-        ax.set_xticklabels(hour_bin_edges)
-ax.legend()
-
-
-
-# %%
-from zoneinfo import ZoneInfo
-from datetime import datetime, timezone
-
-# Dates are in UTC, converting to EAT which is UTC + 3
-time_array = [datetime(d.year, d.month, d.day, (hours[n]+3)%24) for n,d in enumerate(dates)]
-
-
-smoothed_diurnal_data_dict = {'Obs (IMERG)': truth_array,
-                    'GAN': cgan_corrected[:n_samples,:,:,0],
-                    'Fcst': fcst_corrected[:n_samples, :,:]
-                    }
-
-fig, ax = plt.subplots(1,1)
-for name, arr in smoothed_diurnal_data_dict.items():
-    da = xr.DataArray(
-        data=arr,
-        dims=["hour", "lat", "lon"],
-        coords=dict(
-            lon=(longitude_range),
-            lat=(latitude_range),
-            hour=hours,
-        ),
-        attrs=dict(
-            description="Precipitation.",
-            units="mm/hr",
-        ),
-    )
-    summed_data = np.sum(np.sum(da.groupby('hour').sum().values, axis=-1), axis=-1)
-    ax.plot(summed_data, label=name)
-ax.legend()
-
-# %%
-fig, ax = plt.subplots(1,1)
-
-
-for name, arr in smoothed_diurnal_data_dict.items():
-    hours = [hour+3 for hour in hours]
-    se_da = xr.DataArray(
-        data=np.power(truth_array - arr[:n_samples, :,:], 2),
-        dims=["hour", "lat", "lon"],
-        coords=dict(
-            lon=(longitude_range),
-            lat=(latitude_range),
-            hour=hours,
-        ),
-        attrs=dict(
-            description="Precipitation.",
-            units="mm/hr",
-        ),
-    )
-    summed_data = np.sum(np.sum(se_da.groupby('hour').sum().values, axis=-1), axis=-1)
-    ax.plot(summed_data / (truth_array.size / 24), label=name)
-ax.legend()
-
-# # mse by time
-# se_da = xr.DataArray(
-#         data=np.power(truth_array - fcst_corrected[:n_samples, :,:], 2),
-#         dims=["hour", "lat", "lon"],
-#         coords=dict(
-#             lon=(longitude_range),
-#             lat=(latitude_range),
-#             hour=hours,
-#         ),
-#         attrs=dict(
-#             description="Precipitation.",
-#             units="mm/hr",
-#         ),
-#     )
-# n_elements = truth_array.size
-# summed_se = np.sum(np.mean(da.groupby('hour').sum().values, axis=-1), axis=-1)
-# plt.plot(summed_se)
-
-# %%
-import xarray as xr
-from datetime import datetime
-from dsrnngan.utils.utils import get_local_hour
-
-diurnal_data_dict = {'Obs (IMERG)': truth_array,
-                    'GAN': cgan_corrected[:n_samples,:,:,0],
-                    'Fcst': fcst_corrected
-                    }
-
-time_array = [datetime(d.year, d.month, d.day, hours[n]) for n,d in enumerate(dates)]
-
-truth_da = xr.DataArray(
-    data=truth_array,
-    dims=["hour", "lat", "lon"],
-    coords=dict(
-        lon=(longitude_range),
-        lat=(latitude_range),
-        hour=hours,
-    ),
-    attrs=dict(
-        description="Precipitation.",
-        units="mm/hr",
-    ),
-)
-
-
-max_hour_arrays = {}
-# for name, arr in diurnal_data_dict.items():
-name = 'GAN'
-arr = diurnal_data_dict[name]
-
-
-da = xr.DataArray(
-    data=arr,
-    dims=["hour", "lat", "lon"],
-    coords=dict(
-        lon=(longitude_range),
-        lat=(latitude_range),
-        hour=hours,
-    ),
-    attrs=dict(
-        description="Precipitation.",
-        units="mm/hr",
-    ),
-)
-
-
-
-# %%
-
-(_, width, height) = grouped_data.shape
-
-hourly_sum = {(l, get_local_hour(h, longitude_range[l], np.mean(latitude_range))): grouped_data[h,:,l] for h in range(0,24) for l in range(len(longitude_range))}
-
-
-
-# %%
-
-max_hour_arrays[name] = np.empty((len(latitude_range), len(longitude_range)))
-for lt, lat in enumerate(latitude_range):
-    for ln, lon in enumerate(longitude_range):
-
-        hourly_dict = {hr: hourly_sum[(ln, hr)][lt] for hr in range(0,24)}
-        max_hour_arrays[name][lt,ln] = {v:k for k,v in hourly_dict.items()}[max(hourly_dict.values())]
-            
-fig, ax = plt.subplots(2,1, 
-                       subplot_kw={'projection' : ccrs.PlateCarree()},
-                       figsize = (12,16))
-n=0
-for name, max_hour_array in max_hour_arrays.items():
-    if name != 'Obs (IMERG)':
-        
-        im = plot_contourf(ax[n], max_hour_array - max_hour_arrays['Obs (IMERG)'], name, lat_range=latitude_range, lon_range=longitude_range, value_range=np.linspace(-24, 24, 10))
-        n+=1
-
-
-# %%
 
 # %% [markdown]
 # ## ETS
@@ -1918,3 +1888,5 @@ ax[2].set_title('(c)')
 fp = os.path.join(plot_dir, f'ets_{model_type}_{model_number}.pdf')
 print(fp)
 plt.savefig(fp, format='pdf', bbox_inches='tight')
+
+# %%
