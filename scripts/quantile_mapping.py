@@ -24,9 +24,7 @@ HOME = Path(os.getcwd()).parents[0]
 sys.path.insert(1, str(HOME))
 sys.path.insert(1, str(HOME / 'dsrnngan'))
 
-from dsrnngan.data.data import denormalise
 from dsrnngan.evaluation.benchmarks import QuantileMapper, quantile_map_grid
-from dsrnngan.utils.utils import load_yaml_file
 from dsrnngan.utils import read_config
 from dsrnngan.evaluation.plots import plot_quantiles
 
@@ -73,7 +71,6 @@ elif len(samples_gen_array.shape) == 4:
     samples_gen_array = samples_gen_array[...,:1]
     
 fcst_array = arrays['fcst_array'][:n_samples, :,: ]
-persisted_fcst_array = arrays['persisted_fcst'][:n_samples, :,: ]
 ensmean_array = np.mean(samples_gen_array, axis=-1)[:n_samples, :,:]
 dates = [d[0] for d in arrays['dates']][:n_samples]
 hours = [h[0] for h in arrays['hours']][:n_samples]
@@ -152,9 +149,9 @@ cgan_training_data = np.concatenate(cgan_training_data, axis=0)
 ifs_training_data = np.concatenate(ifs_training_data, axis=0)
 
 
-# ###########################
-# print('## Quantile mapping for IFS', flush=True)
-# ###########################
+###########################
+print('## Quantile mapping for IFS', flush=True)
+###########################
 # # Use data prepared by the dsrnngan.data.setupdata script
 # fps = glob('/user/work/uz22147/quantile_training_data/*_744.pkl')
 
