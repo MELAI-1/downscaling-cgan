@@ -34,6 +34,8 @@ from itertools import chain
 import matplotlib as mpl
 from matplotlib import pyplot as plt
 from matplotlib import colorbar, colors, gridspec
+from matplotlib.markers import MarkerStyle
+
 from metpy import plots as metpy_plots
 from matplotlib.colors import ListedColormap, BoundaryNorm
 from string import ascii_lowercase
@@ -58,7 +60,7 @@ from dsrnngan.data import data
 from dsrnngan.model.noise import NoiseGenerator
 from dsrnngan.evaluation.rapsd import plot_spectrum1d, rapsd
 from dsrnngan.evaluation.thresholded_ranks import findthresh
-from dsrnngan.evaluation import scoring
+from dsrnngan.evaluation import scoring, plots
 from dsrnngan.utils.utils import get_best_model_number, load_yaml_file, special_areas, get_area_range
 from dsrnngan.evaluation.benchmarks import QuantileMapper
 from dsrnngan.utils import read_config, utils
@@ -68,8 +70,8 @@ BASE_MODEL_PATH = '/network/group/aopp/predict/HMC005_ANTONIO_EERIE/cgan_data'
 
 
 # %%
-model_type = 'final-nologs'
-area = 'kenya'
+model_type = 'final-nologs-full'
+area = 'all'
 
 log_folders = {
                'final-nologs': {'log_folder': '7c4126e641f81ae0_medium-cl100-final-nologs/n4000_202010-202109_45682_e20', 'model_number': 217600},
@@ -78,11 +80,12 @@ log_folders = {
                'final-nologs-ensemble': {'log_folder': '7c4126e641f81ae0_medium-cl100-final-nologs/n1000_202010-202109_45682_e100', 'model_number': 217600},
 }
 
-format_lookup = {'cGAN': {'color': 'b', 'marker': '+', 'alpha': 1, 'linestyle': '--'},
+
+format_lookup = {'cGAN': {'color': 'b', 'marker': MarkerStyle('o', fillstyle='none'), 'alpha': 1, 'linestyle': '--'},
                 'IMERG': {'color': 'k'},
-                'IFS': {'color': 'r', 'marker': '+', 'alpha': 1, 'linestyle': '--'},
-                'IFS-qm': {'color': 'r', 'marker': 'd', 'alpha': 0.7, 'linestyle': '--'},
-                'cGAN-qm': {'color': 'b', 'marker': 'd', 'alpha': 0.7,'linestyle': '--'}}
+                'IFS': {'color': 'r', 'marker': MarkerStyle('o', fillstyle='none'), 'alpha': 1, 'linestyle': '--'},
+                'IFS-qm': {'color': 'r', 'marker': MarkerStyle('d', fillstyle='none'), 'alpha': 1, 'linestyle': '--'},
+                'cGAN-qm': {'color': 'b', 'marker': MarkerStyle('d', fillstyle='none'), 'alpha':1 ,'linestyle': '--'}}
 
 # %%
 
@@ -331,8 +334,8 @@ precip_levels=np.arange(0, 1.5, 0.15)
 
 
 all_datetimes = [date + timedelta(hours=hours[n]) for n, date in enumerate(dates)]
-# datetimes_to_plot = [datetime(2020,10,21,21,0,0), datetime(2020,12,17,5,0,0),datetime(2021,5,8,8,0,0), datetime(2021,2,19,17,0,0)]
-datetimes_to_plot = [datetime(2021,5,8,8,0,0)]
+datetimes_to_plot = [datetime(2020,10,21,21,0,0), datetime(2020,12,17,5,0,0),datetime(2021,5,8,8,0,0), datetime(2021,2,19,17,0,0)]
+datetimes_to_plot = datetimes_to_plot[2:3]
 indexes = [n for n, item in enumerate(all_datetimes) if item in datetimes_to_plot]
 
 
@@ -385,8 +388,11 @@ cb.ax.set_xlabel("Precipitation (mm / hr)", loc='center')
 plot_fp = os.path.join(plot_dir, f'IFS_qmap_example_{model_type}_{model_number}_{area}.pdf')
 plt.savefig(plot_fp, format='pdf')
 
+# %%
+plot_fp
+
 # %% [markdown]
-# # Rainfall scatter plot
+# # Rainfall scatter  (domain averages)
 
 # %%
 # Rainfall averaged over whole domain
@@ -437,6 +443,25 @@ for metric_name in ['mean']:
     plt.savefig(plot_fp, format='pdf')
 
 # %%
+# Calculate number of exceedances for high rainfall threshold
+thr = 0.3
+cgan_over_thr = [item>= thr for item in scatter_results['mean']['cGAN-qm']]
+ifs_over_thr = [item>= thr for item in scatter_results['mean']['IFS-qm']]
+obs_over_thr = [item>= thr for item in scatter_results['mean']['IMERG']]
+print(sum(cgan_over_thr))
+print(sum(ifs_over_thr))
+print(sum(obs_over_thr))
+
+# %%
+# Find location of these 1mm/hr events
+from collections import Counter
+cnt = Counter(np.array(dates)[obs_over_thr])
+print(cnt.most_common())
+
+print(np.sum([item[1] for item in cnt.most_common(5)]))
+
+
+# %%
 from scipy.stats import binned_statistic
 
 binned_cgan_mean, bin_edges, _ = binned_statistic(truth_array.flatten(), cgan_corrected[...,0].flatten(), statistic='mean', bins=100, range=None)
@@ -469,6 +494,68 @@ for name, d in mean_data.items():
 ax.set_xlabel('Observations (mm/hr)')
 ax.set_ylabel('Model (mm/hr)')
 ax.legend()
+
+# %%
+lat_range_index
+
+# %%
+tmp_area = 'all'
+latitude_range, lat_range_index, longitude_range, lon_range_index = get_area_range(data_config, area=tmp_area)
+
+truth_array[:, lat_range_index[0]:lat_range_index[1]+1, lon_range_index[0]:lon_range_index[1]+1].mean()
+# cgan_corrected[:, lat_range_index[0]:lat_range_index[1]+1, lon_range_index[0]:lon_range_index[1]+1,0]
+# fcst_array = arrays['fcst_array'][:n_samples, lat_range_index[0]:lat_range_index[1]+1, lon_range_index[0]:lon_range_index[1]+1 ]
+
+# %%
+.shape
+
+# %%
+np.mean(truth_array, [1,2])
+
+
+# %%
+# Calculate domain averaged rainfall for areas
+
+def max_mean(arr):
+
+    return arr.mean(axis=(1,2)).max()
+
+for tmp_area in ['all', 'kenya']:
+    print('Area = ', tmp_area)
+    latitude_range, lat_range_index, longitude_range, lon_range_index = get_area_range(data_config, area=tmp_area)
+
+
+    print("obs max mean", max_mean(truth_array[:, lat_range_index[0]:lat_range_index[1]+1, lon_range_index[0]:lon_range_index[1]+1]))
+    print("ifs max mean", max_mean(fcst_corrected[:, lat_range_index[0]:lat_range_index[1]+1, lon_range_index[0]:lon_range_index[1]+1]))
+    print("cgan max mean", max_mean(cgan_corrected[:, lat_range_index[0]:lat_range_index[1]+1, lon_range_index[0]:lon_range_index[1]+1, 0]))
+
+
+# %% [markdown]
+# ## Full scatter plot
+
+# %%
+num_samples = truth_array.flatten().shape[0]
+
+rng = np.random.default_rng()
+
+sample_ixs = rng.choice(range(truth_array.flatten().shape[0]), num_samples, replace=False)
+
+fig, ax = plt.subplots(1,2, figsize=(10,5))
+
+max_val = 80
+scatter_dict = {'cGAN-qm':  cgan_corrected[...,0], 'IFS-qm': fcst_corrected}
+for n, (title, tmp_data) in enumerate(scatter_dict.items()):
+    ax[n].scatter(truth_array.flatten(), tmp_data.flatten(), marker='+', )
+
+    ax[n].set_xlabel('IMERG observations (mm/hr)')
+    ax[n].set_ylabel('Forecasts (mm/hr)')
+    ax[n].set_xlim([0, max_val])
+    ax[n].set_ylim([0, max_val])
+    ax[n].set_title(title)
+
+    ax[n].plot(truth_array.flatten(), truth_array.flatten(), 'k--')
+plot_fp = os.path.join(plot_dir, f'scatter_full_{model_type}_{model_number}_{area}.pdf')
+plt.savefig(plot_fp, format='pdf')
 
 # %% [markdown]
 # # Reliability diagnostics
@@ -725,7 +812,9 @@ for data_name, results in quantile_results_unravelled.items():
                                        c=format_lookup[data_name]['color'],
                                        marker=format_lookup[data_name]['marker'], 
                                        label=data_name,
-                                       s=25)
+                                       alpha=0.75,
+                                       s=25
+                                       )
 if bootstrap_results_dict_fcst_qmap is not None:
    ax[0].errorbar(obs_quantiles[:-2], fcst_quantiles[:-2], yerr=2*bootstrap_results_dict_fcst_qmap['std'][:-2], 
                xerr=2*bootstrap_results_dict_obs['std'][:-2], 
@@ -746,7 +835,9 @@ for v in quantile_results_unravelled.values():
    if max(v) > max_val:
       max_val = max(v)
                 
-for k, v in quantile_annotation_dict.items():
+for n, (k, v) in enumerate(quantile_annotation_dict.items()):
+   if n==0:
+      v = v * 0.9
    ax[0].vlines(v, 0, max_val, linestyles='--')
    ax[0].text(0.95*v,  max_val + 2, f'{np.round(float(k)*100, 12)}th')
 
@@ -766,7 +857,7 @@ if plot_hist:
 
    for n, (name, d) in enumerate(data_dict.items()):
       
-      ax[1].hist(d['data'].flatten(), bins=bin_boundaries, histtype=d['histtype'], label=name, alpha=d.get('alpha'),
+      hist_plot = ax[1].hist(d['data'].flatten(), bins=bin_boundaries, histtype=d['histtype'], label=name, alpha=d.get('alpha'),
                   facecolor=d.get('facecolor'), edgecolor=format_lookup[name]['color'], linestyle= d.get('linestyle'), linewidth=1.5)
       
       
@@ -775,8 +866,8 @@ if plot_hist:
    ax[1].set_xlabel('Rainfall (mm/hr)')
    ax[1].set_ylabel('Frequency of occurence')
    ax[1].set_xlim([0,150])
-   ax[1].vlines(q_99pt99, 0, 10**8, linestyles='--', linewidth=2)
-   ax[1].text(q_99pt99 +1 , 10**8, '$99.99^{th}$')
+   ax[1].vlines(q_99pt99, 0, max(hist_plot[0]), linestyles='--', linewidth=2)
+   ax[1].text(q_99pt99 +1 , max(hist_plot[0]), '$99.99^{th}$')
 
    ax[0].set_title('(a)')
    ax[1].set_title('(b)')
@@ -792,35 +883,39 @@ latitude_range, lat_range_index, longitude_range, lon_range_index = get_area_ran
 
 
 # %%
+lsm = data.load_land_sea_mask(
+                       latitude_vals=latitude_range, 
+                       longitude_vals=longitude_range,
+                       filepath='/network/group/aopp/predict/HMC005_ANTONIO_EERIE/cgan_data/lsm_HRES_EAfrica.nc')
+
+# %%
 # Training data
 
-with open('/user/work/uz22147/logs/cgan/7c4126e641f81ae0_medium-cl100-final-nologs/n18000_201603-202009_6f02b_e1/arrays-217600.pkl', 'rb') as ifh:
-    arrays = pickle.load(ifh)
+with open('/network/group/aopp/predict/HMC005_ANTONIO_EERIE/cgan_data/7c4126e641f81ae0_medium-cl100-final-nologs/n18000_201603-202009_6f02b_e1/obs-mam-train.pkl', 'rb') as ifh:
+    train_obs_array_mam = pickle.load(ifh)
 
-train_obs_array = arrays['truth']
-training_dates = arrays['dates']
+with open('/network/group/aopp/predict/HMC005_ANTONIO_EERIE/cgan_data/7c4126e641f81ae0_medium-cl100-final-nologs/n18000_201603-202009_6f02b_e1/dates.pkl', 'rb') as ifh:
+    training_dates = pickle.load(ifh)
 
-train_obs_array = train_obs_array[:,lat_range_index[0]: lat_range_index[1]+1, lon_range_index[0]: lon_range_index[1]+1]
+# train_obs_array = train_obs_array[:,lat_range_index[0]: lat_range_index[1]+1, lon_range_index[0]: lon_range_index[1]+1]
 
-del arrays
 
-mam_ixs = [n for n, dt in enumerate(training_dates) if dt[0].month in (3,4,5)]
+# mam_ixs = [n for n, dt in enumerate(training_dates) if dt[0].month in (3,4,5)]
 
-train_obs_array_mam = train_obs_array[mam_ixs, :, :]
+# train_obs_array_mam = train_obs_array[mam_ixs, :, :]
 
 
 # %%
 # Validation data
 
-with open('/user/work/uz22147/logs/cgan/7c4126e641f81ae0_medium-cl100-final-nologs/n2900_201806-201903_42e34_e20/arrays-217600.pkl', 'rb') as ifh:
-    arrays = pickle.load(ifh)
+with open('/network/group/aopp/predict/HMC005_ANTONIO_EERIE/cgan_data/7c4126e641f81ae0_medium-cl100-final-nologs/n2900_201806-201903_42e34_e20/arrays-obs.pkl', 'rb') as ifh:
+    val_obs_array = pickle.load(ifh)
 
-val_obs_array = arrays['truth']
-val_dates = arrays['dates']
+with open('/network/group/aopp/predict/HMC005_ANTONIO_EERIE/cgan_data/7c4126e641f81ae0_medium-cl100-final-nologs/n2900_201806-201903_42e34_e20/dates.pkl', 'rb') as ifh:
+    val_dates = pickle.load(ifh)
 
 val_obs_array = val_obs_array[:,lat_range_index[0]: lat_range_index[1]+1, lon_range_index[0]: lon_range_index[1]+1]
 
-del arrays
 
 
 # %%
@@ -831,7 +926,7 @@ in_between_date_ixs = [n for n, dt in enumerate(training_dates) if dt >= date(20
 # %%
 # Normal testing period
 
-with open('/user/work/uz22147/logs/cgan/7c4126e641f81ae0_medium-cl100-final-nologs/n8640_202010-202109_45682_e1/arrays-217600.pkl', 'rb') as ifh:
+with open('/network/group/aopp/predict/HMC005_ANTONIO_EERIE/cgan_data/7c4126e641f81ae0_medium-cl100-final-nologs/n8640_202010-202109_45682_e1/arrays-217600.pkl', 'rb') as ifh:
     arrays = pickle.load(ifh)
 
 normal_test_obs_array = arrays['truth']
@@ -848,7 +943,7 @@ normal_test_obs_array_mam = normal_test_obs_array[relevant_ixs, :, :]
 # %%
 # MAM 2018 testing period
 
-with open('/user/work/uz22147/logs/cgan/7c4126e641f81ae0_medium-cl100-final-nologs/n2088_201803-201805_f37bd_e1/arrays-217600.pkl', 'rb') as ifh:
+with open('/network/group/aopp/predict/HMC005_ANTONIO_EERIE/cgan_data/7c4126e641f81ae0_medium-cl100-final-nologs/n2088_201803-201805_f37bd_e1/arrays-217600.pkl', 'rb') as ifh:
     arrays = pickle.load(ifh)
 
 mam_2018_test_obs_array = arrays['truth']
@@ -858,43 +953,10 @@ mam_2018_test_obs_array = mam_2018_test_obs_array[:,lat_range_index[0]: lat_rang
 del arrays
 
 # %%
-from itertools import chain
+lsm.shape
 
-(q_99pt9, q_99pt99) = np.quantile(truth_array, [0.999, 0.9999])
-
-plt.rcParams.update({'font.size': 20})
-
-fig, axs = plt.subplots(1,1, figsize=(12,10))
-fig.tight_layout(pad=4)
-bin_boundaries=np.arange(0,300,4)
-
-assert mam_2018_test_obs_array.shape[1:] == train_obs_array.shape[1:]
-
-data_dict = {
-    'IMERG train': {'data': train_obs_array, 'histtype': 'stepfilled', 'alpha':0.5, 'facecolor': 'grey'},
-    'IMERG validation': {'data': val_obs_array, 'histtype': 'step', 'edgecolor': 'k'},
-    'IMERG test': {'data': normal_test_obs_array, 'histtype': 'step', 'edgecolor': 'b'},
-    'IMERG MAM 2018': {'data': mam_2018_test_obs_array, 'histtype': 'step', 'edgecolor': 'g'}
-            #  'IMERG train MAM': {'data': train_obs_array_mam, 'histtype': 'stepfilled', 'alpha':0.6, 'facecolor': 'grey'}, 
-            #  'IMERG test normal MAM': {'data': normal_test_obs_array_mam, 'histtype': 'step', 'edgecolor': 'blue'},
-            #  'IMERG test MAM 2018': {'data': mam_2018_test_obs_array, 'histtype': 'step', 'edgecolor': 'green', 'linestyle': '--'},
-            #  'IMERG test normal full': {'data': normal_test_obs_array, 'histtype': 'step', 'edgecolor': 'red', 'linestyle': '--'},
-             }
-rainfall_amounts = {}
-
-for n, (name, d) in enumerate(data_dict.items()):
-    
-    axs.hist(d['data'].flatten(), bins=bin_boundaries, histtype=d['histtype'], label=name, alpha=d.get('alpha'),
-                facecolor=d.get('facecolor'), edgecolor=d.get('edgecolor'), linestyle= d.get('linestyle'), linewidth=3, density=True)
-    
-axs.set_yscale('log')
-axs.legend()
-axs.set_xlabel('Rainfall (mm/hr)')
-axs.set_ylabel('Frequency of occurence')
-axs.set_xlim([0,150])
-
-plot_fp = os.path.join(plot_dir, f'histograms_train_obs_comparison_{model_type}_{model_number}_{area}.pdf')
-plt.savefig(plot_fp, format='pdf', bbox_inches='tight')
+# %%
+train_obs_array_mam.shape
 
 # %%
 from itertools import chain
@@ -907,12 +969,12 @@ fig, axs = plt.subplots(1,1, figsize=(12,10))
 fig.tight_layout(pad=4)
 bin_boundaries=np.arange(0,300,4)
 
-assert mam_2018_test_obs_array.shape[1:] == train_obs_array.shape[1:]
+assert mam_2018_test_obs_array.shape[1:] == train_obs_array_mam.shape[1:]
 
 data_dict = {
-    'IMERG train MAM': {'data': train_obs_array, 'histtype': 'stepfilled', 'alpha':0.5, 'facecolor': 'grey'},
-    'IMERG test MAM': {'data': normal_test_obs_array, 'histtype': 'step', 'edgecolor': 'b'},
-    'IMERG MAM 2018': {'data': mam_2018_test_obs_array, 'histtype': 'step', 'edgecolor': 'g'}
+    'IMERG train MAM': {'data': train_obs_array_mam[:,lsm[:,:-1]>0.0], 'histtype': 'stepfilled', 'alpha':0.5, 'facecolor': 'grey'},
+    'IMERG test MAM': {'data': normal_test_obs_array_mam[:,lsm[:,:-1]>0.0], 'histtype': 'step', 'edgecolor': 'b'},
+    'IMERG MAM 2018': {'data': mam_2018_test_obs_array[:,lsm[:,:-1]>0.0], 'histtype': 'step', 'edgecolor': 'g'}
             #  'IMERG train MAM': {'data': train_obs_array_mam, 'histtype': 'stepfilled', 'alpha':0.6, 'facecolor': 'grey'}, 
             #  'IMERG test normal MAM': {'data': normal_test_obs_array_mam, 'histtype': 'step', 'edgecolor': 'blue'},
             #  'IMERG test MAM 2018': {'data': mam_2018_test_obs_array, 'histtype': 'step', 'edgecolor': 'green', 'linestyle': '--'},
@@ -934,6 +996,45 @@ axs.set_xlim([0,150])
 plot_fp = os.path.join(plot_dir, f'histograms_MAM_comparison_{model_type}_{model_number}_{area}.pdf')
 plt.savefig(plot_fp, format='pdf', bbox_inches='tight')
 
+# %%
+train_obs_array_mam[lsm[:,:-1]>0.0]
+
+# %%
+# Plot locations of high rainfall (above 30mm/hr)
+
+threshold = 30
+
+bool_array = (train_obs_array_mam > threshold).astype(np.int8)
+
+summed_array = np.sum(bool_array, axis=0).astype(np.float32)
+summed_array[summed_array == 0] = np.nan
+
+# %%
+fig, ax = plt.subplots(1,1, subplot_kw = {'projection': ccrs.PlateCarree()})
+ax.imshow(summed_array, interpolation='nearest', origin='lower',
+          extent = [ min(longitude_range), max(longitude_range), min(latitude_range), max(latitude_range)],
+          cmap='viridis')
+
+ax.add_feature(plots.border_feature)
+ax.add_feature(plots.disputed_border_feature)
+ax.add_feature(plots.lake_feature, alpha=0.4)
+ax.coastlines(resolution='10m', color='black', linewidth=0.4)
+
+lon_ticks = np.arange(25, 50,10)
+lat_ticks = np.arange(-10, 15,10)
+ax.set_xticks(lon_ticks)
+ax.set_yticks(lat_ticks)
+ax.set_xticklabels([f'{ln}E' for ln in lon_ticks])
+ax.set_yticklabels([f"{lt}{'N' if lt >0 else 'N'}" for lt in lat_ticks])
+n=1
+        
+# cbar_ax_time = fig.add_subplot(gs[1, 0])
+# cb_time = fig.colorbar(im_imerg, cax=cbar_ax_time, orientation='horizontal', shrink = 0.2, aspect=10, ticks=range(len(hour_bin_edges)),
+#                     )
+# cb_time.ax.set_xticks(range(0,24,3))
+# cb_time.ax.set_xticklabels(range(0,24,3))
+# cb_time.ax.set_xlabel("Peak rainfall hour (EAT)", loc='center')
+
 # %% [markdown]
 # ### Bias
 
@@ -946,9 +1047,6 @@ bias_std_dict = {'cGAN-qm': np.std(cgan_corrected[...,0], axis=0) - np.std(truth
             'IFS-qm' : np.std(fcst_corrected, axis=0) - np.std(truth_array,axis=0)}
 
 # %%
-np.mean(cgan_corrected[0,:,:,0])
-
-# %%
 # Domain averaged biases
 
 domain_rainfall_obs = np.array([np.mean(truth_array[n,...]) for n in range(truth_array.shape[0])])
@@ -957,9 +1055,6 @@ domain_rainfall_ifs = np.array([np.mean(fcst_corrected[n,...]) for n in range(tr
 
 print(f'Domain averaged bias cGAN: {np.mean(domain_rainfall_cgan - domain_rainfall_obs)}')
 print(f'Domain averaged bias IFS: {np.mean(domain_rainfall_ifs - domain_rainfall_obs)}')
-
-# %%
-domain_rainfall_obs.shape
 
 # %%
 bias_summary_stats = {}
@@ -971,9 +1066,6 @@ print(bias_summary_stats)
 
 # %%
 cgan_corrected[relevant_ixs,:,:,0].shape
-
-# %%
-[np.round(item, 2) for item in np.arange(-max_cbar_val, max_cbar_val, 0.1)]
 
 # %%
 lat_range=latitude_range
@@ -1074,69 +1166,74 @@ plot_filename = os.path.join(plot_dir, f'bias_hr{hr_start}-{hr_end}_{model_type}
 plt.savefig(plot_filename, format='pdf', bbox_inches='tight')
 
 # %%
+[np.round(item, 2) for item in np.arange(-max_cbar_val, max_cbar_val, 0.1)]
+
+# %%
 # Loop over hour intervals
 
-interval = 6
-hour_ranges = [(interval*n,interval*(n+1)) for n in range(int(24/interval))]
+interval = 3
+min_hour = 0
 
-num_rows = len(hour_ranges)
-num_cols = 2
+for min_hour in [0,12]: # Splitting up the plots since they otherwise are too large
+    hour_ranges = [(min_hour + interval*n,min_hour + interval*(n+1)) for n in range(int(12/interval))]
 
-# Hour filtering
-fig = plt.figure(constrained_layout=True, figsize=(1.5*2.5*num_cols, 1.5*3*num_rows))
-gs = gridspec.GridSpec(num_rows + 1, num_cols, figure=fig, 
-                    height_ratios=[1]*num_rows + [0.05],
-                    wspace=0.005)
+    num_rows = len(hour_ranges)
+    num_cols = 2
 
-for m, (hr_start, hr_end) in enumerate(hour_ranges):
+    # Hour filtering
+    fig = plt.figure(constrained_layout=True, figsize=(1.5*2.5*num_cols, 1.5*3*num_rows))
+    gs = gridspec.GridSpec(num_rows + 1, num_cols, figure=fig, 
+                        height_ratios=[1]*num_rows + [0.05],
+                        wspace=0.005)
 
-
-    relevant_ixs = [n for n, h in enumerate(hours) if h in np.arange(hr_start, hr_end)]
-    
-    bias_dict = {'cGAN-qm': np.mean(cgan_corrected[relevant_ixs,:,:,0] - truth_array[relevant_ixs,:,:], axis=0),
-                'IFS-qm' : np.mean(fcst_corrected[relevant_ixs,:,:] - truth_array[relevant_ixs,:,:], axis=0)}
-
-    max_bias_val = max([v.max() for v in bias_dict.values()])
-    min_bias_val = min([v.min() for v in bias_dict.values()])
-
-    max_cbar_val = 0.5
-    value_range = list(np.arange(-max_cbar_val, max_cbar_val + 0.01, 0.01))
-    cbar_tick_vals = [np.round(item, 2) for item in np.arange(-max_cbar_val, max_cbar_val + 0.01, 0.1)]
-
-    for col, (k,v) in enumerate(bias_dict.items()):
-
-        ax = fig.add_subplot(gs[m, col], projection = ccrs.PlateCarree())
-
-        #remove edges
-        edge_len =5
-
-        title = f'{k} {hr_start:02d}-{hr_end:02d}h ({np.sqrt(np.power(bias_dict[k],2).mean()):0.2f})'
-
-        im = plot_contourf(v, 
-                        title=title, 
-                        ax=ax,
-                        cmap='BrBG', 
-                        value_range=value_range, 
-                        lat_range=latitude_range,
-                        lon_range=longitude_range 
-                        )
-        lon_ticks = np.arange(25, 50,10)
-        lat_ticks = np.arange(-10, 15,10)
-        ax.set_xticks(lon_ticks)
-        ax.set_yticks(lat_ticks)
-        ax.set_xticklabels([f'{ln}E' for ln in lon_ticks])
-        ax.set_yticklabels([f"{np.abs(lt)}{'N' if lt >=0 else 'S'}" for lt in lat_ticks])
-
-cbar_ax = fig.add_subplot(gs[-1, :])
-cb = fig.colorbar(im, cax=cbar_ax, orientation='horizontal', shrink = 0.2, aspect=10,
-                )
-cb.ax.set_xticks(cbar_tick_vals)
-cb.ax.set_xticklabels(cbar_tick_vals)
-cb.ax.set_xlabel("Average bias (mm/hr)", loc='center')
+    for m, (hr_start, hr_end) in enumerate(hour_ranges):
 
 
-plot_filename = os.path.join(plot_dir, f'bias_hour_ranges_{model_type}{model_number}_{area}.pdf')
-plt.savefig(plot_filename, format='pdf', bbox_inches='tight')
+        relevant_ixs = [n for n, h in enumerate(hours) if h in np.arange(hr_start, hr_end)]
+        
+        bias_dict = {'cGAN-qm': np.mean(cgan_corrected[relevant_ixs,:,:,0] - truth_array[relevant_ixs,:,:], axis=0),
+                    'IFS-qm' : np.mean(fcst_corrected[relevant_ixs,:,:] - truth_array[relevant_ixs,:,:], axis=0)}
+
+        max_bias_val = max([v.max() for v in bias_dict.values()])
+        min_bias_val = min([v.min() for v in bias_dict.values()])
+
+        max_cbar_val = 0.5
+        value_range = list(np.arange(-max_cbar_val, max_cbar_val + 0.01, 0.01))
+        cbar_tick_vals = [np.round(item, 2) for item in np.arange(-max_cbar_val, max_cbar_val + 0.01, 0.1)]
+
+        for col, (k,v) in enumerate(bias_dict.items()):
+
+            ax = fig.add_subplot(gs[m, col], projection = ccrs.PlateCarree())
+
+            #remove edges
+            edge_len =5
+
+            title = f'{k} {hr_start:02d}-{hr_end:02d}h ({np.sqrt(np.power(bias_dict[k],2).mean()):0.2f})'
+
+            im = plot_contourf(v, 
+                            title=title, 
+                            ax=ax,
+                            cmap='BrBG', 
+                            value_range=value_range, 
+                            lat_range=latitude_range,
+                            lon_range=longitude_range 
+                            )
+            lon_ticks = np.arange(25, 50,10)
+            lat_ticks = np.arange(-10, 15,10)
+            ax.set_xticks(lon_ticks)
+            ax.set_yticks(lat_ticks)
+            ax.set_xticklabels([f'{ln}E' for ln in lon_ticks])
+            ax.set_yticklabels([f"{np.abs(lt)}{'N' if lt >=0 else 'S'}" for lt in lat_ticks])
+
+    cbar_ax = fig.add_subplot(gs[-1, :])
+    cb = fig.colorbar(im, cax=cbar_ax, orientation='horizontal', shrink = 0.2, aspect=10,
+                    )
+    cb.ax.set_xticks(cbar_tick_vals)
+    cb.ax.set_xticklabels(cbar_tick_vals)
+    cb.ax.set_xlabel("Average bias (mm/hr)", loc='center')
+
+    plot_filename = os.path.join(plot_dir, f'bias_hour_ranges_{min(hour_ranges[0])}-{max(hour_ranges[-1])}_{model_type}{model_number}_{area}.pdf')
+    plt.savefig(plot_filename, format='pdf', bbox_inches='tight')
 
 # %%
 plot_filename
@@ -1784,9 +1881,9 @@ threshold = 40
 bool_array = (truth_array > threshold).astype(np.int8)
 
 summed_array = np.sum(bool_array, axis=0)
+summed_array[summed_array == 0] = np.nan
 
 # %%
-summed_array[summed_array == 0] = np.nan
 
 # %%
 fig, ax = plt.subplots(1,1, subplot_kw = {'projection': ccrs.PlateCarree()})

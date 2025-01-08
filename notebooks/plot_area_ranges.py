@@ -67,9 +67,6 @@ cmap = plt.get_cmap('terrain')
 new_cmap = truncate_colormap(cmap, 0.2, 0.9)
 
 # %%
-special_areas
-
-# %%
 from matplotlib import gridspec
 
 plt.rcParams.update({'font.size': 20})

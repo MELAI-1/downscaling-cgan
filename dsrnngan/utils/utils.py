@@ -27,7 +27,7 @@ special_areas = {'all': {'lat_range': None, 'abbrv': 'ALL'},
                  'east_lv_basin': {'lat_range': [-3.15, 1.55], 'lon_range': [34.5,36.0],  'abbrv': 'ELVB'},
                  'nw_ethiopian_highlands': {'lat_range': [6.10, 14.15], 'lon_range': [34.60, 40.30], 'abbrv': 'NWEH'},
                  'kenya': {'lat_range': [-4.65, 5.15], 'lon_range': [34.05, 42.15], 'abbrv': 'K'},
-                 'kenya_core': {'lat_range': [-4.05, 1.15], 'lon_range': [34.05, 39.05], 'abbrv': 'KC'}
+                 'kenya_core': {'lat_range': [-4.05, 1.15], 'lon_range': [35.05, 39.05], 'abbrv': 'KC'}
 
 }
 
