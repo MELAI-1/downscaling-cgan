@@ -8,7 +8,7 @@
 #       format_version: '1.3'
 #       jupytext_version: 1.16.2
 #   kernelspec:
-#     display_name: Python 3 (ipykernel)
+#     display_name: cgan
 #     language: python
 #     name: python3
 # ---
@@ -505,13 +505,6 @@ latitude_range, lat_range_index, longitude_range, lon_range_index = get_area_ran
 truth_array[:, lat_range_index[0]:lat_range_index[1]+1, lon_range_index[0]:lon_range_index[1]+1].mean()
 # cgan_corrected[:, lat_range_index[0]:lat_range_index[1]+1, lon_range_index[0]:lon_range_index[1]+1,0]
 # fcst_array = arrays['fcst_array'][:n_samples, lat_range_index[0]:lat_range_index[1]+1, lon_range_index[0]:lon_range_index[1]+1 ]
-
-# %%
-.shape
-
-# %%
-np.mean(truth_array, [1,2])
-
 
 # %%
 # Calculate domain averaged rainfall for areas
@@ -1884,8 +1877,6 @@ summed_array = np.sum(bool_array, axis=0)
 summed_array[summed_array == 0] = np.nan
 
 # %%
-
-# %%
 fig, ax = plt.subplots(1,1, subplot_kw = {'projection': ccrs.PlateCarree()})
 ax.imshow(summed_array, interpolation='nearest', origin='lower',
           extent = [ min(longitude_range), max(longitude_range), min(latitude_range), max(latitude_range)],
@@ -1910,5 +1901,3 @@ n=1
 # cb_time.ax.set_xticks(range(0,24,3))
 # cb_time.ax.set_xticklabels(range(0,24,3))
 # cb_time.ax.set_xlabel("Peak rainfall hour (EAT)", loc='center')
-
-# %%
