@@ -1,12 +1,13 @@
 # Downscaling conditional Generative Adversarial Network (cGAN)
 
-Code to downscale or postprocess NWP forecasts using a cGAN. Forked from the code at https://github.com/ljharris23/public-downscaling-cgan.
+Code to downscale or postprocess NWP forecasts using a cGAN. Forked from the code at [https://github.com/bobbyantonio/downscaling-cgan].
 
 Main modifications
-- Making the code more generally applicable to different regions, and different domain sizes.
+
+<!-- Making the code more generally applicable to different regions, and different domain sizes.
 - Making the data and models more config-driven.
 - Adding extra features, like changes to input and output normalisation.
-
+- Ce paragraphe explique la structure du projet -->
 # Setup
 
 Uses Python3.9 and Tensorflow 2.8.2
