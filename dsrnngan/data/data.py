@@ -106,16 +106,21 @@ NGCM_NORMALISATION_STRATEGY = data_config.ngcm_input_normalisation_strategy
 VAR_LOOKUP_IFS = {field: IFS_NORMALISATION_STRATEGY[re.sub(r'([0-9]*[a-z]+)[0-9]*', r'\1', field)] 
                   for field in all_ifs_fields}
 
-##🚩NGCM
+##🚩NGCM Var lookup
 VAR_LOOKUP_NGCM = {field: NGCM_NORMALISATION_STRATEGY[field] for field in all_ngcm_fields}
 
 
 all_era5_fields = list(VAR_LOOKUP_ERA5.keys())
 
-input_field_lookup = {'ifs': all_ifs_fields, 'era5': all_era5_fields}
+##🚩all ngcm fields
+all_ngcm_fields = list(VAR_LOOKUP_NGCM.keys())
+
+##🚩Add ngcm fields 
+input_field_lookup = {'ifs': all_ifs_fields, 'era5': all_era5_fields,'ngcm': all_ngcm_fields}
 
 NORMALISATION_YEAR = data_config.normalisation_year
 
+##🚩Define the default coordinates
 DEFAULT_LATITUDE_RANGE=np.arange(data_config.min_latitude, data_config.max_latitude + data_config.latitude_step_size, data_config.latitude_step_size)
 DEFAULT_LONGITUDE_RANGE=np.arange(data_config.min_longitude, data_config.max_longitude + data_config.longitude_step_size, data_config.longitude_step_size)
 
@@ -237,6 +242,8 @@ def get_obs_dates(date_range: list,  hour: int, obs_data_source: str,
     
     return sorted(obs_dates)
 
+
+##🚩this fuction is used to get the dates for which there is observational and forecast data available
 def get_dates(years, obs_data_source: str, 
               fcst_data_source: str,
               data_paths=DATA_PATHS):
@@ -263,6 +270,7 @@ def get_dates(years, obs_data_source: str,
     obs_dates = set([item for item in date_range if file_exists(data_source=obs_data_source, year=item.year,
                                                     month=item.month, day=item.day,
                                                     data_paths=data_paths)])
+##🚩Get forecast dates
     fcst_dates = set([item for item in date_range if file_exists(data_source=fcst_data_source, year=item.year,
                                                     month=item.month, day=item.day,
                                                     data_paths=data_paths)])
@@ -270,7 +278,7 @@ def get_dates(years, obs_data_source: str,
         
     return [item.strftime('%Y%m%d') for item in dates]
 
-
+##🚩 add the code for ngcm 
 def file_exists(data_source: str, year: int,
                 month: int, day:int, hour='random',
                 data_paths=DATA_PATHS):
@@ -310,6 +318,11 @@ def file_exists(data_source: str, year: int,
     elif data_source == 'ifs':
         fp = get_ifs_filepath('tp', loaddate=datetime(year, month, day), 
                                   loadtime='12', fcst_dir=data_path)
+        if os.path.isfile(fp):
+            return True
+    elif data_source == 'ngcm':
+        fp = get_ngcm_filepath('precipitation_cumulative_mean', loaddate=datetime(year, month, day),
+                                  loadtime=hour, fcst_dir=data_path)
         if os.path.isfile(fp):
             return True
 
@@ -441,7 +454,7 @@ def load_hdf5_file(fp: str, group_name:str ='Grid'):
 
     return ds
 
-
+##🚩 we needd to update the stat_dict 
 def preprocess(variable: str, 
                ds: xr.Dataset, 
                normalisation_strategy: dict, 
@@ -699,6 +712,41 @@ def get_ifs_filepath(field: str, loaddate: datetime,
         
     return fp
 
+
+##🚩Definition get_ngcm filepath
+def get_ngcm_filepath(field: str, loaddate: datetime, 
+                     loadtime: int, fcst_dir: str=NGCM_PATH):   
+    
+# Get ngcm filepath for time/data combination
+
+#     Args:
+#         field (str): name of field
+#         loaddate (datetime): load datetime
+#         loadtime (int): load time
+#         fcst_dir (str, optional): directory of forecast data. Defaults to ngcm.
+
+#     Returns:
+#         str: filepath
+
+    filename = f"{field}_2.8deg_6h_GHA_{loaddate.strftime('%Y-%m-%d')}_{loadtime}h.nc"
+
+    top_level_folder = re.sub(r'([0-9]*[a-z]+)[0-9]*', r'\1', field)
+    subdirectory = True
+    
+    if top_level_folder == field:
+        subdirectory = False
+    
+    if subdirectory:
+        fp = os.path.join(fcst_dir, top_level_folder, field, filename)
+    else:
+        fp = os.path.join(fcst_dir, top_level_folder, filename)
+        
+    return fp
+
+
+
+
+
 def get_ifs_forecast_time(year: int, 
                           month: int, 
                           day:int, hour: int):
@@ -716,6 +764,37 @@ def get_ifs_forecast_time(year: int,
         tuple: tuple containing (load date, load time)
     """
     
+    time = datetime(year=year, month=month, day=day, hour=hour)
+    
+    if time.hour < 6:
+        loaddate = time - timedelta(days=1)
+        loadtime = '12'
+    elif 6 <= time.hour < 18:
+        loaddate = time
+        loadtime = '00'
+    elif 18 <= time.hour < 24:
+        loaddate = time
+        loadtime = '12'
+    else:
+        raise ValueError("Not acceptable time")
+    
+    return loaddate, loadtime
+
+##🚩Get the ngcm forecast_time
+def get_ngcm_forecast_time(year: int, 
+                          month: int, 
+                          day:int, hour: int):      
+    
+    """Get the closest NGCM forecast load (between 6-18h lead time) to the target
+    year/month/day/hour combination 
+    Args:
+        year (int): year    
+        month (int): month
+        day (int): day
+        hour (int): hour    
+    Returns:    
+        tuple: tuple containing (load date, load time)
+    """
     time = datetime(year=year, month=month, day=day, hour=hour)
     
     if time.hour < 6:
@@ -817,6 +896,101 @@ def load_ifs_raw(field: str,
              
     return ds
 
+##🚩Load ngcm raw 
+def load_ngcm_raw(field: str, 
+                 year: int, 
+                 month: int,
+                 day: int, hour: int, ngcm_data_dir: str=NGCM_PATH,
+                 latitude_vals: list=None, longitude_vals: list=None,
+                 interpolate: bool=True, ##🚩check if we need to change or not 
+                 convert_to_float_64: bool=False):  
+    """
+    Load raw NGCM data (i.e without any normalisation or conversion to mm/hr)   
+    Args:
+        field (str): name of field
+        year (int): year
+        month (int): month
+        day (int): day
+        hour (int): hour
+        ngcm_data_dir (str, optional): folder with NGCM data in. Defaults to NGCM_PATH.
+        latitude_vals (list, optional): latitude values to filter/interpolate to. Defaults to None.
+        longitude_vals (list, optional): longitude values to filter/interpolate to. Defaults to None.
+        interpolate (bool, optional): whether or not to interpolate. Defaults to True.
+        convert_to_float_64 (bool, optional): Whether or not to convert to float 64,
+    Returns:
+        xr.Dataset: dataset
+    """     
+    if not isinstance(latitude_vals[0], np.float32):
+        latitude_vals = np.array(latitude_vals).astype(np.float32)
+        longitude_vals = np.array(longitude_vals).astype(np.float32)
+
+    assert field in all_ngcm_fields, ValueError(f"field must be one of {all_ngcm_fields}")
+    
+    t = datetime(year=year, month=month, day=day, hour=hour)
+    t_plus_one = datetime(year=year, month=month, day=day, hour=hour) + timedelta(hours=1)
+
+    # Get the nearest forecast starttime
+    loaddate, loadtime = get_ngcm_forecast_time(year, month, day, hour)
+    
+    fp = get_ngcm_filepath(field=field,
+                          loaddate=loaddate,
+                          loadtime=loadtime,
+                          fcst_dir=ngcm_data_dir
+                          )
+
+    ds = xr.open_dataset(fp)
+    var_names = list(ds.data_vars)
+    
+    if np.round(ds.longitude.values.max(), 6) < np.round(max(longitude_vals), 6) or np.round(ds.longitude.values.min(), 6) > np.round(min(longitude_vals), 6):
+        raise ValueError('Longitude range outside of data range')
+    
+    if np.round(ds.latitude.values.max(), 6) < np.round(max(latitude_vals),6) or np.round(ds.latitude.values.min(),6) > np.round(min(latitude_vals), 6):
+        raise ValueError('Latitude range outside of data range')
+    
+    assert len(var_names) == 1, ValueError('More than one variable found; cannot automatically infer variable name')
+    var_name = list(ds.data_vars)[0]
+    
+    if convert_to_float_64:
+        # Multiplication with float32 leads to some discrepancies
+        # But in some cases this is outweighed by speed 
+        ds[var_name] = ds[var_name].astype(np.float64)
+      
+      
+    
+    # Account for cumulative fields
+    
+    ##🚩🚩  Note that this is only for the cumulative mean precipitation field
+    # which is the only one we use at the moment
+    # If we add more cumulative fields, this will need to be updated
+       
+    cumuative_fields=['precipitation_cumulative_mean']
+    conservative_fields=['precipitation_cumulative_mean']
+    if var_name in cumuative_fields:
+        # Output rainfall during the following hour
+        ds =  ds.sel(time=t_plus_one) - ds.sel(time=t)
+    else:
+        ds = ds.sel(time=t)
+
+    if latitude_vals is not None and longitude_vals is not None:
+        if interpolate:
+            if var_name in conservative_fields:
+                interpolation_method = 'conservative'
+            else:
+                interpolation_method = 'bilinear'
+            ds = interpolate_dataset_on_lat_lon(ds, latitude_vals=latitude_vals,
+                                                longitude_vals=longitude_vals,
+                                                interp_method=interpolation_method)
+        else:
+            ds = ds.sel(longitude=longitude_vals, method='backfill')
+            ds = ds.sel(latitude=latitude_vals, method='backfill')
+    
+    ds = make_dataset_consistent(ds)
+    ds = ds.transpose('latitude', 'longitude')
+             
+    return ds
+
+
+
 def load_ifs(field: str, 
              date, hour: int,
              normalisation_strategy: dict,
@@ -873,6 +1047,62 @@ def load_ifs(field: str,
     y = np.array(ds[var_name][:, :])
     
     return y
+
+##🚩Load ngcm 
+def load_ngcm(field: str, 
+             date, hour: int,
+             normalisation_strategy: dict,
+             norm: bool=False,
+             fcst_dir: str=NGCM_PATH,
+             latitude_vals: list=None, 
+             longitude_vals: list=None,
+             constants_path: str=CONSTANTS_PATH):   
+    """
+    Load NGCM (including normalisation and conversion to mm/hr)
+    Args:
+        field (str): name of field
+        date (str or datetime): YYYYMMDD string or datetime to forecast
+        hour (int): hour to forecast
+        norm (bool, optional): whether or not to normalise the data. Defaults to False.
+        fcst_dir (str, optional): forecast data directory. Defaults to NGCM_PATH.
+        normalisation_strategy (str, optional): dict with normalisation details for variables. Defaults to VAR_LOOKUP_NGCM.
+        latitude_vals (list, optional): latitude values to filter/interpolate to. Defaults to None.
+        longitude_vals (list, optional): longitude_vals to filter/interpolate to. Defaults to None.
+        constants_path (str, optional): path to constant data. Defaults to CONSTANTS_PATH.      
+    Returns:
+        np.ndarray: data for the specified field
+    """
+    if isinstance(date, str):
+        date = datetime.strptime(date, "%Y%m%d")
+        
+    ds = load_ngcm_raw(field, date.year, date.month, date.day, hour, ifs_data_dir=fcst_dir,
+                      latitude_vals=latitude_vals, longitude_vals=longitude_vals, interpolate=True)
+    
+    var_name = list(ds.data_vars)[0]
+    
+    if not normalisation_strategy[field].get('negative_vals', True):
+        # Make sure no negative values
+        ds[var_name] = ds[var_name].clip(min=0)
+        
+    # if field in ['tp', 'cp', 'pr', 'prl', 'prc']:
+    #     # precipitation is measured in metres, so multiply up
+    #     ds[var_name] = 1000 * ds[var_name]
+        
+    # if field == 'cin':
+    #     # Replace null values with 0
+    #     ds[var_name] = ds[var_name].fillna(0)
+        
+    if norm:
+        stats_dict = get_ifs_stats(field, latitude_vals=latitude_vals, longitude_vals=longitude_vals,
+                            use_cached=True, ifs_data_dir=fcst_dir,
+                            output_dir=constants_path)
+        # Normalisation here      
+        ds = preprocess(field, ds, stats_dict=stats_dict, normalisation_strategy=normalisation_strategy)
+    
+    y = np.array(ds[var_name][:, :])
+    
+    return y
+
 
 
 def load_fcst_stack(data_source: str, fields: list, 
@@ -976,6 +1206,79 @@ def get_ifs_stats(field: str, latitude_vals: list, longitude_vals: list, output_
 
     return stats
 
+
+def get_ngcm_stats(field: str, latitude_vals: list, longitude_vals: list, output_dir: str=None,
+                   use_cached: bool=True, year: int=NORMALISATION_YEAR,
+                   ngcm_data_dir: str=NGCM_PATH, hours: list=all_fcst_hours):
+    """
+    Get statistics for NGCM data        
+    Args:
+        field (str): name of field
+        latitude_vals (list): list of latitude values
+        longitude_vals (list): list of longitude values 
+        output_dir (str, optional): directory to save output. Defaults to None.
+        use_cached (bool, optional): whether to use cached stats. Defaults to True.
+        year (int, optional): year to calculate stats for. Defaults to NORMALISATION_YEAR
+        ngcm_data_dir (str, optional): directory with NGCM data. Defaults to NGCM_PATH.
+        hours (list, optional): list of hours to calculate stats for. Defaults to all_fcst_hours.   
+    Returns:
+        dict: dictionary with statistics
+    """ 
+    min_lat = int(min(latitude_vals))
+    max_lat = int(max(latitude_vals))
+    min_lon = int(min(longitude_vals))
+    max_lon = int(max(longitude_vals))
+
+
+    # Filepath is specific to make sure we don't use the wrong normalisation stats
+    fp = f'{output_dir}/NGCM_norm_{field}_{year}_lat{min_lat}-{max_lat}lon{min_lon}-{max_lon}.pkl'
+
+    var_name = None
+
+    if use_cached and os.path.isfile(fp):
+        logger.debug('Loading stats from cache')
+
+        with open(fp, 'rb') as f:
+            stats = pickle.load(f)
+
+    else:
+        print('Calculating stats')
+        all_dates = list(pd.date_range(start=f'{year}-01-01', end=f'{year}-12-01', freq='D'))
+        all_dates = [item.date() for item in all_dates]
+
+        datasets = []
+        
+        for date in all_dates:
+            year = date.year
+            month = date.month
+            day = date.day
+            
+            for hour in hours:
+            
+                tmp_ds = load_ngcm_raw(field, year, month, day, hour, 
+                                    latitude_vals=latitude_vals,
+                                    longitude_vals=longitude_vals, 
+                                    ifs_data_dir=ngcm_data_dir,
+                                    interpolate=False)
+                if not var_name:
+                    var_names = list(tmp_ds.data_vars)
+                    assert len(var_names) == 1, ValueError('More than one variable found; cannot automatically infer variable name')
+                    var_name = list(tmp_ds.data_vars)[0]
+
+                datasets.append(tmp_ds)
+        concat_ds = xr.concat(datasets, dim='time')
+
+        stats = {'min': np.abs(concat_ds[var_name]).min().values,
+                'max': np.abs(concat_ds[var_name]).max().values,
+                'mean': concat_ds[var_name].mean().values,
+                'std': concat_ds[var_name].std().values}
+
+        if output_dir:
+            with open(fp, 'wb') as f:
+                pickle.dump(stats, f, pickle.HIGHEST_PROTOCOL)
+
+    return stats
+    
 
 ### Functions that work with the ERA5 data in University of Bristol
 
