@@ -36,23 +36,51 @@ LSM_PATH = DATA_PATHS["GENERAL"].get("LSM")
 CONSTANTS_PATH = DATA_PATHS["GENERAL"].get("CONSTANTS")
 NGCM_PATH = DATA_PATHS["GENERAL"].get("NGCM", '')
 
-FIELD_TO_HEADER_LOOKUP_IFS = {'tp': 'sfc',
-                              'cp': 'sfc',
-                              'sp': 'sfc',
-                              'tisr': 'sfc',
-                              'cape': 'sfc',
-                              'tclw': 'sfc',
-                              'tcwv': 'sfc',
-                              'u700': 'winds',
-                              'v700': 'winds',
-                              #   'cdir': 'missing',
-                              #   'tcrw': 'missing'
-                              }
-
+# FIELD_TO_HEADER_LOOKUP_IFS = {'tp': 'sfc',
+#                               'cp': 'sfc',
+#                               'sp': 'sfc',
+#                               'tisr': 'sfc',
+#                               'cape': 'sfc',
+#                               'tclw': 'sfc',
+#                               'tcwv': 'sfc',
+#                               'u700': 'winds',
+#                               'v700': 'winds',
+#                               #   'cdir': 'missing',
+#                               #   'tcrw': 'missing'
+#                               }
 # 'cin', Left out for the moment as contains a lot of nulls
+
+##🚩Add field_to_header_lookup_ngcm
+
+    # It is used to map the field names to the headers in the NGCM data files.
+    #we choose also here the variable we want to use for our project 
+    #1-
+
+    #sfc:surface , atmos:atmosphere , winds
+FIELD_TO_HEADER_LOOKUP_NGCM = {
+    'evaporation': 'sfc',
+    # 'geopotential': 'atmos',
+    'precipitation_cumulative_mean': 'sfc',
+    'specific_cloud_ice_water_content': 'atmos',    
+    # 'specific_cloud_liquid_water_content': 'atmos',
+    # 'specific_humidity': 'sfc',
+    # 'temperature': 'sfc',
+    'u_component_of_wind': 'winds',
+    'v_component_of_wind': 'winds'
+}
+
+
 all_ifs_fields = ['2t', 'cape',  'cp', 'r200', 'r700', 'r950', 
                   'sp', 't200', 't700', 'tclw', 'tcwv', 'tisr', 'tp', 
                   'u200', 'u700', 'v200', 'v700', 'w200', 'w500', 'w700', 'cin']
+
+
+
+##🚩NGCM fields
+
+all_ngcm_fields=['evaporation', 'geopotential', 'precipitation_cumulative_mean', 'specific_cloud_ice_water_content', 'specific_cloud_liquid_water_content', 'specific_humidity', 'temperature', 'u_component_of_wind', 'v_component_of_wind']
+
+
 input_fields = data_config.input_fields
 constant_fields = data_config.constant_fields
 all_fcst_hours = np.array(range(24))
@@ -72,8 +100,15 @@ VAR_LOOKUP_ERA5 = {'tp': {'folder': 'total_precipitation', 'suffix': 'day',
 
 IFS_NORMALISATION_STRATEGY = data_config.input_normalisation_strategy
 
+##🚩NGCM NORMALISATION STRATEGY
+NGCM_NORMALISATION_STRATEGY = data_config.ngcm_input_normalisation_strategy
+
 VAR_LOOKUP_IFS = {field: IFS_NORMALISATION_STRATEGY[re.sub(r'([0-9]*[a-z]+)[0-9]*', r'\1', field)] 
                   for field in all_ifs_fields}
+
+##🚩NGCM
+VAR_LOOKUP_NGCM = {field: NGCM_NORMALISATION_STRATEGY[field] for field in all_ngcm_fields}
+
 
 all_era5_fields = list(VAR_LOOKUP_ERA5.keys())
 
