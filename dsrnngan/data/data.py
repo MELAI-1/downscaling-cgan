@@ -1136,6 +1136,8 @@ def load_fcst_stack(data_source: str, fields: list,
         load_function = load_ifs
     elif data_source == 'era5':
         load_function = load_era5
+    elif data_source == 'ngcm':
+        load_function = load_ngcm
     else:
         raise ValueError(f'Unknown data source {data_source}')
 
@@ -1206,7 +1208,7 @@ def get_ifs_stats(field: str, latitude_vals: list, longitude_vals: list, output_
 
     return stats
 
-
+##🚩get ngcm stats
 def get_ngcm_stats(field: str, latitude_vals: list, longitude_vals: list, output_dir: str=None,
                    use_cached: bool=True, year: int=NORMALISATION_YEAR,
                    ngcm_data_dir: str=NGCM_PATH, hours: list=all_fcst_hours):
