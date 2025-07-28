@@ -8,9 +8,12 @@ from typing import Union, Iterable
 from tensorflow.keras.utils import Sequence
 
 from dsrnngan.data.data import load_fcst_radar_batch, load_hires_constants, all_fcst_hours, DATA_PATHS, all_ifs_fields, all_era5_fields, input_fields
+##🚩import ngcm function 
+from dsrnngan.data.data import load_ngcm, all_ngcm_fields, all_ngcm_hours, get_ngcm_stats, all_ngcm_fields
 from dsrnngan.utils.read_config import read_model_config, get_data_paths, get_lat_lon_range_from_config
 
-fields_lookup = {'ifs': all_ifs_fields, 'era5': all_era5_fields}
+##🚩fields lookup
+fields_lookup = {'ifs': all_ifs_fields, 'era5': all_era5_fields, 'ngcm': all_ngcm_fields}
 
 class DataGenerator(Sequence):
     def __init__(self, dates: list, batch_size: int, data_config: SimpleNamespace,
@@ -45,7 +48,7 @@ class DataGenerator(Sequence):
 
             if self.forecast_data_source == 'era5':
                 raise ValueError('ERA5 data only supports daily')
-
+            #  ##🚩update this part if self.forecast_data_source == 'ngcm': 
         else:
             raise ValueError(f"Unsupported hour {hour}")
     

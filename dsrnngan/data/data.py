@@ -1535,13 +1535,13 @@ def load_imerg(date: datetime, hour: int=18, data_dir: str=IMERG_PATH,
 
     return precip
 
-
+##🚩modify parameter to run the code 
 if __name__ == '__main__':
 
     # Batch job for loading / saving only the relevant data
 
     parser = ArgumentParser(description='Subset data to desired lat/lon range')
-    parser.add_argument('--fcst-data-source', choices=['ifs', 'era5'], type=str,
+    parser.add_argument('--fcst-data-source', choices=['ifs', 'era5','ngcm'], type=str,
                         help='Source of forecast data')
     parser.add_argument('--obs-data-source', choices=['nimrod', 'imerg'], type=str,
                         help='Source of observational (ground truth) data')
@@ -1571,6 +1571,7 @@ if __name__ == '__main__':
     imerg_folders = ['IMERG', 'half_hourly', 'final']
     era5_output_dir = os.path.join(args.output_dir, 'ERA5')
     imerg_output_dir = os.path.join(args.output_dir, '/'.join(imerg_folders))
+    
 
     if not os.path.isdir(era5_output_dir):
         os.mkdir(era5_output_dir)

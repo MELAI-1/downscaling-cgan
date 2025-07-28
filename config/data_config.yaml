@@ -11,7 +11,9 @@ max_latitude: 15.05
 latitude_step_size: 0.1
 min_longitude: 25.05
 max_longitude: 51.45
-longitude_step_size: 0.1
+longitude_step_size: 0.1 ##🚩 The longitude step size is set to 2.8 for the NGCM data
+
+##🚩 we need to change the input fields 
 input_fields: 
     - 2t
     - cape
@@ -81,10 +83,26 @@ input_normalisation_strategy:
       normalisation: "max"
     tisr:
       normalisation: "max"
+
+##🚩 NGCM input normalisation strategy
+
+ngcm_input_normalisation_strategy:
+    evaporation:
+      normalisation: "log"
+    precipitation_cumulative_mean:  
+      negative_vals: False
+      normalisation: "log"
+    specific_cloud_ice_water_content:
+      negative_vals: False
+      normalisation: "log"
+    u_component_of_wind:
+      normalisation: "minmax"
+    v_component_of_wind:
+      normalisation: "minmax"
 paths:
   BLUE_PEBBLE:
       GENERAL:
-          IMERG: '/bp1/geog-tropical/users/uz22147/east_africa_data/IMERG/half_hourly/final/'
+          IMERG: '/bp1/geog-tropical/users/uz22147/east_africa_data/IMERG/half_hourly/final/' ##🚩IMERG data path need  also to be change and i need also to make sure that the 
           ERA5: '/bp1/geog-tropical/data/ERA-5/day'
           IFS: '/bp1/geog-tropical/users/uz22147/east_africa_data/IFS'
           OROGRAPHY: '/bp1/geog-tropical/users/uz22147/east_africa_data/constants/h_HRES_EAfrica.nc'
@@ -92,5 +110,7 @@ paths:
           LAKES: '/bp1/geog-tropical/users/uz22147/east_africa_data/constants/lake_mask.nc'
           SEA: '/bp1/geog-tropical/users/uz22147/east_africa_data/constants/sea_mask.nc'
           CONSTANTS: '/bp1/geog-tropical/users/uz22147/east_africa_data/constants'
+          NGCM: '/bp1/geog-tropical/users/uz22147/east_africa_data/NGCM' ##🚩NGCM data is not yet available, so this is a placeholder for now.
+          
       TFRecords:
           tfrecords_path: '/user/work/uz22147/tfrecords/'
