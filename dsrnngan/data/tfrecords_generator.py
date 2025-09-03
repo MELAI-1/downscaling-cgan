@@ -29,6 +29,10 @@ ds_fac = model_config.downscaling_factor
 # Use autotune to tune the prefetching of records in parrallel to processing to improve performance
 AUTOTUNE = tf.data.AUTOTUNE
 
+
+
+## for the batch size I need to use 128 for the generation
+
 def DataGenerator(data_label, batch_size, fcst_shape, con_shape, 
                   out_shape, repeat=True, 
                   downsample=False, weights=None, crop_size=None, rotate=False,
