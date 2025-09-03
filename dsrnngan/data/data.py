@@ -78,8 +78,9 @@ all_ifs_fields = ['2t', 'cape',  'cp', 'r200', 'r700', 'r950',
 
 ##🚩NGCM fields
 
-all_ngcm_fields=['evaporation', 'geopotential', 'precipitation_cumulative_mean', 'specific_cloud_ice_water_content', 'specific_cloud_liquid_water_content', 'specific_humidity', 'temperature', 'u_component_of_wind', 'v_component_of_wind']
+#all_ngcm_fields=['evaporation', 'geopotential', 'precipitation_cumulative_mean', 'specific_cloud_ice_water_content', 'specific_cloud_liquid_water_content', 'specific_humidity', 'temperature', 'u_component_of_wind', 'v_component_of_wind']
 
+all_ngcm_fields=['evaporation',  'precipitation_cumulative_mean', 'specific_cloud_ice_water_content_500','specific_cloud_ice_water_content_700', 'specific_cloud_ice_water_content_850', 'u_component_of_wind_500','u_component_of_wind_700','u_component_of_wind_850', 'v_component_of_wind_500','v_component_of_wind_700','v_component_of_wind_850']
 
 input_fields = data_config.input_fields
 constant_fields = data_config.constant_fields
@@ -107,7 +108,8 @@ VAR_LOOKUP_IFS = {field: IFS_NORMALISATION_STRATEGY[re.sub(r'([0-9]*[a-z]+)[0-9]
                   for field in all_ifs_fields}
 
 ##🚩NGCM Var lookup
-VAR_LOOKUP_NGCM = {field: NGCM_NORMALISATION_STRATEGY[field] for field in all_ngcm_fields}
+VAR_LOOKUP_NGCM = {field: NGCM_NORMALISATION_STRATEGY[re.sub(r'([a-z_]+)[0-9]+', r'\1', field).rstrip('_')] 
+                   for field in all_ngcm_fields}
 
 
 all_era5_fields = list(VAR_LOOKUP_ERA5.keys())
@@ -327,7 +329,8 @@ def file_exists(data_source: str, year: int,
             return True
 
     elif data_source == 'era5':
-        # These are just meaningless dates to get the filepath
+        # These are just meaningless dates to get the filepath 
+        ##🚩 I need to make sure that the name of the total precipitation in the era 5 is called like this 
         era5_fp = get_era5_path('tp', year=year, month=month, era_data_dir=data_path)
         glob_str = era5_fp
         if len(glob(glob_str)) > 0:
@@ -453,8 +456,8 @@ def load_hdf5_file(fp: str, group_name:str ='Grid'):
     ds = xr.open_dataset(xr.backends.NetCDF4DataStore(nch))
 
     return ds
-
-##🚩 we needd to update the stat_dict 
+ 
+##🚩 we needd to update the stat_dict
 def preprocess(variable: str, 
                ds: xr.Dataset, 
                normalisation_strategy: dict, 
@@ -533,6 +536,9 @@ def load_orography(filepath: str=OROGRAPHY_PATH,
         np.ndarray: orography data array
     """
     ds = xr.load_dataset(filepath)
+    
+    ##🚩 we needd to check this part 
+
     
     # Note that this assumes the orography is somewhat filtered already 
     # If it is worldwide orography then normalised values will probably be too small!
@@ -715,32 +721,31 @@ def get_ifs_filepath(field: str, loaddate: datetime,
 
 ##🚩Definition get_ngcm filepath
 def get_ngcm_filepath(field: str, loaddate: datetime, 
-                     loadtime: int, fcst_dir: str=NGCM_PATH):   
+                     loadtime: int, fcst_dir: str = NGCM_PATH):
+    """
+    Get ngcm filepath for time/data combination with variable/year structure.
+
+    Args:
+        field (str): name of field
+        loaddate (datetime): load datetime
+        loadtime (int): load time
+        fcst_dir (str, optional): directory of forecast data. Defaults to NGCM_PATH.
+
+    Returns:
+        str: filepath
+    """
+    # Extract year from loaddate for the filename and subdirectory
+    year = loaddate.year
     
-# Get ngcm filepath for time/data combination
+    # Generate filename with the new structure
+    filename = f"{field}_{year}_ngcm_{field}_2.8deg_6h_GHA_{loaddate.strftime('%Y%m%d')}_{loadtime}h.nc"
 
-#     Args:
-#         field (str): name of field
-#         loaddate (datetime): load datetime
-#         loadtime (int): load time
-#         fcst_dir (str, optional): directory of forecast data. Defaults to ngcm.
-
-#     Returns:
-#         str: filepath
-
-    filename = f"{field}_2.8deg_6h_GHA_{loaddate.strftime('%Y-%m-%d')}_{loadtime}h.nc"
-
-    top_level_folder = re.sub(r'([0-9]*[a-z]+)[0-9]*', r'\1', field)
-    subdirectory = True
+    # Use the full field as the top-level folder (no normalization needed here)
+    variable_folder = field
     
-    if top_level_folder == field:
-        subdirectory = False
+    # Construct the full filepath with variable/year structure
+    fp = os.path.join(fcst_dir, variable_folder, str(year), filename)
     
-    if subdirectory:
-        fp = os.path.join(fcst_dir, top_level_folder, field, filename)
-    else:
-        fp = os.path.join(fcst_dir, top_level_folder, filename)
-        
     return fp
 
 
@@ -1104,6 +1109,7 @@ def load_ngcm(field: str,
     return y
 
 
+##🚩we need to check this function also 
 
 def load_fcst_stack(data_source: str, fields: list, 
                     date: str, hour: int, 
@@ -1209,6 +1215,8 @@ def get_ifs_stats(field: str, latitude_vals: list, longitude_vals: list, output_
     return stats
 
 ##🚩get ngcm stats
+##I think we don't need this part because we alreaddy compute the stats for ngcm.
+
 def get_ngcm_stats(field: str, latitude_vals: list, longitude_vals: list, output_dir: str=None,
                    use_cached: bool=True, year: int=NORMALISATION_YEAR,
                    ngcm_data_dir: str=NGCM_PATH, hours: list=all_fcst_hours):
