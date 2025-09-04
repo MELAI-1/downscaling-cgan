@@ -33,7 +33,7 @@ dependencies:
   - wandb
   - timezonefinder
   - metpy
-  - gitpython
+  - gitpython  # Duplicated entry
   - jupytext
-  pip:
-    - tensorflow-gpu=2.8.2
+pip:
+  - tensorflow-gpu=2.8.2

@@ -194,3 +194,27 @@ def get_config_objects(config: dict):
     data_config = read_data_config(data_config_dict=data_config)
         
     return model_config, data_config
+
+    def update_data_config_for_bucket(data_config: types.SimpleNamespace, bucket_url: str):
+        """
+        Update the data_config object to use an online bucket for data paths.
+
+        Args:
+            data_config (types.SimpleNamespace): The data config object.
+            bucket_url (str): The URL or path to the online bucket.
+
+        Returns:
+            types.SimpleNamespace: Updated data config object.
+        """
+        # Assume data_paths is a dictionary of keys to local paths
+        # Replace each path with the bucket URL + relative path
+        if hasattr(data_config, "paths") and isinstance(data_config.paths, dict):
+            updated_paths = {}
+            for key, path in data_config.paths.items():
+                # If path is already a URL, skip; otherwise, prepend bucket_url
+                if isinstance(path, str) and not path.startswith("http"):
+                    updated_paths[key] = f"{bucket_url.rstrip('/')}/{path.lstrip('/')}"
+                else:
+                    updated_paths[key] = path
+            data_config.paths = updated_paths
+        return data_config

@@ -19,6 +19,8 @@ from types import SimpleNamespace
 tz_finder = TimezoneFinder()
 from_zone = tz.gettz('UTC')
 
+##🚩update the special areas 
+
 special_areas = {'all': {'lat_range': None, 'abbrv': 'ALL'},
                  'lake_victoria': {'lat_range': [-4.05,2.05], 'lon_range': [29.05, 37.05], 'abbrv': 'LV'},
                  'somalia': {'lat_range': [-1.05,4.05], 'lon_range': [40.0, 44.05],  'abbrv': 'S'},
