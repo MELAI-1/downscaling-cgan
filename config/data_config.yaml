@@ -1,5 +1,5 @@
 data_paths: "BLUE_PEBBLE"  # Choose which paths version to use in PATHS
-fcst_data_source: "ifs"
+fcst_data_source: "ngcm"
 obs_data_source: "imerg"
 # normalisation_year: 2017
 normalisation_year: 2018
@@ -7,6 +7,12 @@ num_samples: 320000
 normalise_inputs: True
 output_normalisation: "log"
 num_classes: 4 # Number of bins to split data into
+
+##🚩 I start with different value of dowscaling factor 
+downscaling_factor: 2
+##🚩 The right value of dowsclaing of ngcm but due to resources constraint  I need to start with this small one=4
+# downscaling_factor: 28
+# dowscaling_steps:[2,2,7] 
 
 ##🚩 I change the coordinates of latitude and longitude
 # min_latitude: -11.95  
@@ -59,51 +65,51 @@ input_fields:
 constant_fields:
     - orography
     - lsm
-# input_normalisation_strategy:
-#     tpq:
-#       negative_vals: False
-#       normalisation: "log"
-#     tp:
-#       negative_vals: False
-#       normalisation: "log"
-#     cp: 
-#       negative_vals: False
-#       normalisation: "log"
-#     pr:
-#       negative_vals: False
-#       normalisation: "log"
-#     prl:
-#       negative_vals: False
-#       normalisation: "log"
-#     prc:
-#       negative_vals: False
-#       normalisation: "log"
-#     sp:
-#       normalisation: "minmax"
-#     u: 
-#       normalisation: "max"
-#     v:
-#       normalisation: "max"
-#     w: 
-#       normalisation: "max"
-#     r:
-#       normalisation: "max"
-#     2t:
-#       normalisation: "minmax"
-#       negative_vals: False
-#     cape: 
-#       normalisation: "log"
-#     cin:
-#       normalisation: "max" 
-#     t:
-#       normalisation: "minmax"
-#       negative_vals: False
-#     tclw:
-#       normalisation: "log" 
-#     tcwv:
-#       normalisation: "max"
-#     tisr:
-#       normalisation: "max"
+input_normalisation_strategy:
+    tpq:
+      negative_vals: False
+      normalisation: "log"
+    tp:
+      negative_vals: False
+      normalisation: "log"
+    cp: 
+      negative_vals: False
+      normalisation: "log"
+    pr:
+      negative_vals: False
+      normalisation: "log"
+    prl:
+      negative_vals: False
+      normalisation: "log"
+    prc:
+      negative_vals: False
+      normalisation: "log"
+    sp:
+      normalisation: "minmax"
+    u: 
+      normalisation: "max"
+    v:
+      normalisation: "max"
+    w: 
+      normalisation: "max"
+    r:
+      normalisation: "max"
+    2t:
+      normalisation: "minmax"
+      negative_vals: False
+    cape: 
+      normalisation: "log"
+    cin:
+      normalisation: "max" 
+    t:
+      normalisation: "minmax"
+      negative_vals: False
+    tclw:
+      normalisation: "log" 
+    tcwv:
+      normalisation: "max"
+    tisr:
+      normalisation: "max"
 
 ##🚩 NGCM input normalisation strategy
 

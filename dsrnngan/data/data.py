@@ -36,18 +36,18 @@ LSM_PATH = DATA_PATHS["GENERAL"].get("LSM")
 CONSTANTS_PATH = DATA_PATHS["GENERAL"].get("CONSTANTS")
 NGCM_PATH = DATA_PATHS["GENERAL"].get("NGCM", '')
 
-# FIELD_TO_HEADER_LOOKUP_IFS = {'tp': 'sfc',
-#                               'cp': 'sfc',
-#                               'sp': 'sfc',
-#                               'tisr': 'sfc',
-#                               'cape': 'sfc',
-#                               'tclw': 'sfc',
-#                               'tcwv': 'sfc',
-#                               'u700': 'winds',
-#                               'v700': 'winds',
-#                               #   'cdir': 'missing',
-#                               #   'tcrw': 'missing'
-#                               }
+FIELD_TO_HEADER_LOOKUP_IFS = {'tp': 'sfc',
+                              'cp': 'sfc',
+                              'sp': 'sfc',
+                              'tisr': 'sfc',
+                              'cape': 'sfc',
+                              'tclw': 'sfc',
+                              'tcwv': 'sfc',
+                              'u700': 'winds',
+                              'v700': 'winds',
+                              #   'cdir': 'missing',
+                              #   'tcrw': 'missing'
+                              }
 # 'cin', Left out for the moment as contains a lot of nulls
 
 ##🚩Add field_to_header_lookup_ngcm
