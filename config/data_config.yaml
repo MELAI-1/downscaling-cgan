@@ -129,19 +129,21 @@ ngcm_input_normalisation_strategy:
 paths:
   BLUE_PEBBLE:
       GENERAL:
-          IMERG: '/bp1/geog-tropical/users/uz22147/east_africa_data/IMERG/half_hourly/final/' ##🚩IMERG data path need  also to be change and i need also to make sure that the 
+          IMERG: '/home/melvin_aims_ac_za/data/IMERG' ##🚩IMERG data path need  also to be change and i need also to make sure that the 
           ERA5: '/bp1/geog-tropical/data/ERA-5/day'
           IFS: '/bp1/geog-tropical/users/uz22147/east_africa_data/IFS'
-          OROGRAPHY: '/bp1/geog-tropical/users/uz22147/east_africa_data/constants/h_HRES_EAfrica.nc'
-          LSM: '/bp1/geog-tropical/users/uz22147/east_africa_data/constants/lsm_HRES_EAfrica.nc'
+          OROGRAPHY: '/home/melvin_aims_ac_za/data/constants/h_HRES_EAfrica.nc'
+          LSM: '/home/melvin_aims_ac_za/data/constants/lsm_HRES_EAfrica.nc'
           LAKES: '/bp1/geog-tropical/users/uz22147/east_africa_data/constants/lake_mask.nc'
           SEA: '/bp1/geog-tropical/users/uz22147/east_africa_data/constants/sea_mask.nc'
-          CONSTANTS: '/bp1/geog-tropical/users/uz22147/east_africa_data/constants'
-          NGCM: 'gs://melvin_aims_bucket/NGCM' ##🚩NGCM data is not yet available, so this is a placeholder for now.
+          CONSTANTS: '/home/melvin_aims_ac_za/data/constants/'
+          NGCM: '/home/melvin_aims_ac_za/data/NGCM' ##🚩NGCM data is not yet available, so this is a placeholder for now.
+          STATS: '/home/melvin_aims_ac_za/data/constants/neuralgcm_Horn_Africa_2018_stats.pkl' ##🚩 I add this path for the statistics 
           
       TFRecords:
           # tfrecords_path: '/user/work/uz22147/tfrecords/'
-          tfrecords_path: 'gs://melvin_aims_bucket/tfrecords/' ##🚩 need to change the tfrecord path
+          tfrecords_path: '/home/melvin_aims_ac_za/data/tfrecords' ##🚩 need to change the tfrecord path
+
 
 
           # Pour spécifier un chemin d'accès dans un bucket (par exemple sur un stockage cloud comme Google Cloud Storage ou Azure Blob Storage),

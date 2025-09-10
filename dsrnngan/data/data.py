@@ -35,6 +35,7 @@ OROGRAPHY_PATH = DATA_PATHS["GENERAL"].get("OROGRAPHY")
 LSM_PATH = DATA_PATHS["GENERAL"].get("LSM")
 CONSTANTS_PATH = DATA_PATHS["GENERAL"].get("CONSTANTS")
 NGCM_PATH = DATA_PATHS["GENERAL"].get("NGCM", '')
+STATS_PATH = DATA_PATHS["GENERAL"].get("STATS", '')
 
 FIELD_TO_HEADER_LOOKUP_IFS = {'tp': 'sfc',
                               'cp': 'sfc',
@@ -1217,6 +1218,80 @@ def get_ifs_stats(field: str, latitude_vals: list, longitude_vals: list, output_
 ##🚩get ngcm stats
 ##I think we don't need this part because we alreaddy compute the stats for ngcm.
 
+# def get_ngcm_stats(field: str, latitude_vals: list, longitude_vals: list, output_dir: str=None,
+#                    use_cached: bool=True, year: int=NORMALISATION_YEAR,
+#                    ngcm_data_dir: str=NGCM_PATH, hours: list=all_fcst_hours):
+#     """
+#     Get statistics for NGCM data        
+#     Args:
+#         field (str): name of field
+#         latitude_vals (list): list of latitude values
+#         longitude_vals (list): list of longitude values 
+#         output_dir (str, optional): directory to save output. Defaults to None.
+#         use_cached (bool, optional): whether to use cached stats. Defaults to True.
+#         year (int, optional): year to calculate stats for. Defaults to NORMALISATION_YEAR
+#         ngcm_data_dir (str, optional): directory with NGCM data. Defaults to NGCM_PATH.
+#         hours (list, optional): list of hours to calculate stats for. Defaults to all_fcst_hours.   
+#     Returns:
+#         dict: dictionary with statistics
+#     """ 
+#     min_lat = int(min(latitude_vals))
+#     max_lat = int(max(latitude_vals))
+#     min_lon = int(min(longitude_vals))
+#     max_lon = int(max(longitude_vals))
+
+
+#     ##🚩get ngcm stats as i already calculate this
+#     # Filepath is specific to make sure we don't use the wrong normalisation stats
+#     # fp = f'{output_dir}/NGCM_norm_{field}_{year}_lat{min_lat}-{max_lat}lon{min_lon}-{max_lon}.pkl'
+
+#     var_name = None
+
+#     if use_cached and os.path.isfile(fp):
+#         logger.debug('Loading stats from cache')
+
+#         with open(fp, 'rb') as f:
+#             stats = pickle.load(f)
+
+#     else:
+#         print('Calculating stats')
+#         all_dates = list(pd.date_range(start=f'{year}-01-01', end=f'{year}-12-01', freq='D'))
+#         all_dates = [item.date() for item in all_dates]
+
+#         datasets = []
+        
+#         for date in all_dates:
+#             year = date.year
+#             month = date.month
+#             day = date.day
+            
+#             for hour in hours:
+            
+#                 tmp_ds = load_ngcm_raw(field, year, month, day, hour, 
+#                                     latitude_vals=latitude_vals,
+#                                     longitude_vals=longitude_vals, 
+#                                     ifs_data_dir=ngcm_data_dir,
+#                                     interpolate=False)
+#                 if not var_name:
+#                     var_names = list(tmp_ds.data_vars)
+#                     assert len(var_names) == 1, ValueError('More than one variable found; cannot automatically infer variable name')
+#                     var_name = list(tmp_ds.data_vars)[0]
+
+#                 datasets.append(tmp_ds)
+#         concat_ds = xr.concat(datasets, dim='time')
+
+#         stats = {'min': np.abs(concat_ds[var_name]).min().values,
+#                 'max': np.abs(concat_ds[var_name]).max().values,
+#                 'mean': concat_ds[var_name].mean().values,
+#                 'std': concat_ds[var_name].std().values}
+
+#         if output_dir:
+#             with open(fp, 'wb') as f:
+#                 pickle.dump(stats, f, pickle.HIGHEST_PROTOCOL)
+
+#     return stats
+   
+   
 def get_ngcm_stats(field: str, latitude_vals: list, longitude_vals: list, output_dir: str=None,
                    use_cached: bool=True, year: int=NORMALISATION_YEAR,
                    ngcm_data_dir: str=NGCM_PATH, hours: list=all_fcst_hours):
@@ -1240,8 +1315,7 @@ def get_ngcm_stats(field: str, latitude_vals: list, longitude_vals: list, output
     max_lon = int(max(longitude_vals))
 
 
-    # Filepath is specific to make sure we don't use the wrong normalisation stats
-    fp = f'{output_dir}/NGCM_norm_{field}_{year}_lat{min_lat}-{max_lat}lon{min_lon}-{max_lon}.pkl'
+    fp =STATS_PATH 
 
     var_name = None
 
@@ -1288,6 +1362,7 @@ def get_ngcm_stats(field: str, latitude_vals: list, longitude_vals: list, output
                 pickle.dump(stats, f, pickle.HIGHEST_PROTOCOL)
 
     return stats
+  
     
 
 ### Functions that work with the ERA5 data in University of Bristol
@@ -1449,16 +1524,29 @@ def load_era5(ifield, date, hour=0, log_precip=False, norm=False, fcst_dir=ERA5_
 
     return y
 
+ ##🚩I update the function to collect the imerg file
+ 
+# def get_imerg_filepaths(year: int, month: int, day: int, 
+#                         hour: int, imerg_data_dir: str=IMERG_PATH, 
+#                         file_ending: str='.nc'):
+    
+#     dt_start = datetime(year, month, day, hour, 0, 0) 
+        
+#     fp1 = os.path.join(imerg_data_dir, '3B-HHR.MS.MRG.3IMERG.' + dt_start.strftime('%Y%m%d-S%H0000-E%H2959') + f'.{2*hour * 30:04d}.V06B{file_ending}')
+#     fp2 = os.path.join(imerg_data_dir, '3B-HHR.MS.MRG.3IMERG.' + dt_start.strftime('%Y%m%d-S%H3000-E%H5959') + f'.{(2*hour + 1) * 30:04d}.V06B{file_ending}')
+    
+#     return [fp1, fp2]
 def get_imerg_filepaths(year: int, month: int, day: int, 
                         hour: int, imerg_data_dir: str=IMERG_PATH, 
                         file_ending: str='.nc'):
     
-    dt_start = datetime(year, month, day, hour, 0, 0) 
-        
-    fp1 = os.path.join(imerg_data_dir, '3B-HHR.MS.MRG.3IMERG.' + dt_start.strftime('%Y%m%d-S%H0000-E%H2959') + f'.{2*hour * 30:04d}.V06B{file_ending}')
-    fp2 = os.path.join(imerg_data_dir, '3B-HHR.MS.MRG.3IMERG.' + dt_start.strftime('%Y%m%d-S%H3000-E%H5959') + f'.{(2*hour + 1) * 30:04d}.V06B{file_ending}')
+    dt_start = datetime(year, month, day, hour) 
+    year_str = dt_start.strftime('%Y')
+    file_name=dt_start.strftime('%Y%m%d_%H') + file_ending
     
-    return [fp1, fp2]
+    imerg_file_path=os.path.join(imerg_data_dir, year_str, file_name)        
+    
+    return [imerg_file_path]
     
 def load_imerg_raw(year: int, month: int, day: int, 
                    hour:int, latitude_vals: list=None, 
