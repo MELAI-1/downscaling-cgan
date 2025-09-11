@@ -774,6 +774,8 @@ def get_ngcm_filepath(field: str, loaddate: datetime,
     """
     # Extract year from loaddate for the filename and subdirectory
     year = loaddate.year
+    print(loaddate)
+    print(loadtime)
     
     # Generate filename with the new structure
     filename = f"{field}_{year}_ngcm_{field}_2.8deg_6h_GHA_{loaddate.strftime('%Y%m%d')}_{loadtime:02d}h.nc"
