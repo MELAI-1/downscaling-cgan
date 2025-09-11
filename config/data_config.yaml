@@ -191,11 +191,11 @@ num_classes: 4
 
 downscaling_factor: 2
 
-min_latitude: -20 
-max_latitude: 30
+min_latitude: -18 
+max_latitude: 29
 latitude_step_size: 2.8
-min_longitude: 15
-max_longitude: 60
+min_longitude: 17
+max_longitude: 59
 longitude_step_size: 2.8
 
 input_fields: 
