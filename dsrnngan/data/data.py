@@ -1018,9 +1018,9 @@ def load_ngcm_raw(field: str,
     conservative_fields=['precipitation_cumulative_mean']
     if var_name in cumuative_fields:
         # Output rainfall during the following hour
-        ds =  ds.sel(time=t_plus_one) - ds.sel(time=t)
+        ds =  ds.sel(date=t_plus_one) - ds.sel(date=t)   ##🚩🚩 change time to date
     else:
-        ds = ds.sel(time=t)
+        ds = ds.sel(date=t)
 
     if latitude_vals is not None and longitude_vals is not None:
         if interpolate:
