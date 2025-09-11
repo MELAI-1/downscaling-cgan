@@ -557,7 +557,7 @@ def load_observational_data(data_source: str, *args, **kwargs):
 def load_orography(filepath: str=OROGRAPHY_PATH, 
                    latitude_vals: list=None, 
                    longitude_vals: list=None,
-                   interpolate: bool=True):
+                   interpolate: bool=False):
     """
     Load orography values
 
@@ -598,10 +598,13 @@ def load_orography(filepath: str=OROGRAPHY_PATH,
 
     return h_vals
 
+
+
+    ##🚩#change interpolate to False
 def load_land_sea_mask(filepath=LSM_PATH, 
                        latitude_vals=None, 
                        longitude_vals=None,
-                       interpolate=True):
+                       interpolate=False):
     """
     Load land-sea mask values
 
