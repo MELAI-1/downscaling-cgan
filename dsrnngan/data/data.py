@@ -1147,8 +1147,8 @@ def load_ngcm(field: str,
     #     ds[var_name] = ds[var_name].fillna(0)
         
     if norm:
-        stats_dict = get_ifs_stats(field, latitude_vals=latitude_vals, longitude_vals=longitude_vals,
-                            use_cached=True, ifs_data_dir=fcst_dir,
+        stats_dict = get_ngcm_stats(field, latitude_vals=latitude_vals, longitude_vals=longitude_vals,
+                            use_cached=True, ngcm_data_dir=fcst_dir,
                             output_dir=constants_path)
         # Normalisation here      
         ds = preprocess(field, ds, stats_dict=stats_dict, normalisation_strategy=normalisation_strategy)
