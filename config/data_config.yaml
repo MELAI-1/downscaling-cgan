@@ -137,7 +137,7 @@ paths:
           LAKES: '/bp1/geog-tropical/users/uz22147/east_africa_data/constants/lake_mask.nc'
           SEA: '/bp1/geog-tropical/users/uz22147/east_africa_data/constants/sea_mask.nc'
           CONSTANTS: '/home/melvin_aims_ac_za/data/constants/'
-          NGCM: '/home/melvin_aims_ac_za/data/NGCM/evaporation' ##🚩
+          NGCM: '/home/melvin_aims_ac_za/data/NGCM/' ##🚩
           STATS: '/home/melvin_aims_ac_za/data/constants/neuralgcm_Horn_Africa_2018_stats.pkl' ##🚩 I add this path for the statistics 
           
       NGCM:
