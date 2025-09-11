@@ -1020,15 +1020,14 @@ def load_ngcm_raw(field: str,
        
     cumuative_fields=['precipitation_cumulative_mean']
     conservative_fields=['precipitation_cumulative_mean']
-    # if var_name in cumuative_fields:
+    surface_fields=['precipitation_cumulative_mean','evaporation']
+    if var_name in surface_fields:
         # Output rainfall during the following hour
         # ds =  ds.sel(date=t_plus_one) - ds.sel(date=t)   ##🚩🚩 change time to date
-    try:
+    
         
-        ds=ds.isel(time=-1)  ##🚩🚩 change time to date
-    except:
-        print(ds)
-   
+        ds=ds.isel(time=-1).isel(surface=0) ##🚩🚩 change time to date
+ 
     if latitude_vals is not None and longitude_vals is not None:
         if interpolate:
             if var_name in conservative_fields:
@@ -1043,7 +1042,8 @@ def load_ngcm_raw(field: str,
             ds = ds.sel(latitude=latitude_vals, method='backfill')
     
     ds = make_dataset_consistent(ds)
-    ds = ds.isel(surface=0).transpose('latitude', 'longitude')
+    
+    ds = ds.transpose('latitude', 'longitude')
              
     return ds
 
