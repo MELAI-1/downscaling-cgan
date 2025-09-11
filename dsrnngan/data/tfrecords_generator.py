@@ -382,7 +382,8 @@ def write_data(year_month_ranges: list,
     
     #  Create directory that is hash of setup params, so that we know it's the right data later on
     data_config_dict = utils.convert_namespace_to_dict(data_config)
-    hash_dir = os.path.join(records_folder, hash_dict(data_config_dict))
+    # hash_dir = os.path.join(records_folder, hash_dict(data_config_dict))
+    hash_dir = os.path.join(records_folder, 'final_tfrecord/')  ##🚩 change here to final for the time being)
     
     if not os.path.isdir(hash_dir):
         os.makedirs(hash_dir, exist_ok=True)
