@@ -373,6 +373,7 @@ def write_data(year_month_ranges: list,
     
     if not data_config:
         data_config = read_config.read_config(config_filename='data_config.yaml')
+        print('No config provided, reading from default location') ###🚩 add this print statement
 
     data_paths=get_data_paths(data_config=data_config)
     records_folder = data_paths['TFRecords']["tfrecords_path"]
