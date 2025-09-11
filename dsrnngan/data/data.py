@@ -522,16 +522,16 @@ def preprocess(variable: str,
     if normalisation_type:
 
         if normalisation_type == 'standardise':
-            ds[var_name] = (ds[var_name] - stats_dict[var_name]['mean']) / stats_dict[var_name]['std']
+            ds[var_name] = (ds[var_name] - stats_dict[variable]['mean']) / stats_dict[variable]['std']
 
         elif normalisation_type == 'minmax':
-            ds[var_name] = (ds[var_name] - stats_dict[var_name]['min']) / (stats_dict[var_name]['max'] - stats_dict[var_name]['min'])
+            ds[var_name] = (ds[var_name] - stats_dict[variable]['min']) / (stats_dict[variable]['max'] - stats_dict[variable]['min'])
         
         elif normalisation_type == 'log':
             ds[var_name] = log_plus_1(ds[var_name])
             
         elif normalisation_type == 'max':
-            ds[var_name] = ds[var_name] / stats_dict[var_name]['max']
+            ds[var_name] = ds[var_name] / stats_dict[variable]['max']
             
         elif normalisation_type == 'sqrt':
             ds[var_name] = normalise_precipitation(ds[var_name], 'sqrt')
