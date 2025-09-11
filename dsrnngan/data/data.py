@@ -1677,7 +1677,7 @@ def load_imerg(date: datetime, hour: int=18, data_dir: str=IMERG_PATH,
                         latitude_vals=latitude_vals, longitude_vals=longitude_vals, imerg_data_dir=data_dir)
 
     # Take mean since data may be half hourly
-    precip = ds['precipitationCal'].values
+    precip = ds['precipitation'].values
     ds.close()
     
     if normalisation_type is not None:
