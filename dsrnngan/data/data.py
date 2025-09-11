@@ -341,66 +341,48 @@ def get_dates(years, obs_data_source: str,
     
 #     return False
 
+
 def file_exists(data_source: str, year: int, month: int, day: int, hour='random', data_paths=None):
     """
-    Vérifie si un fichier existe pour la date donnée selon le data_source.
-
+    Check if a file exists for the given data source and date.
+    
     Args:
-        data_source (str): 'ngcm', 'imerg', 'ifs', 'era5', 'nimrod'
-        year, month, day (int)
-        hour (int or 'random'): heure du forecast
-        data_paths (dict): dictionnaire des chemins
-
+        data_source (str): 'ngcm' or 'imerg'
+        year, month, day (int): date
+        hour (int or 'random'): forecast hour
+        data_paths (dict): dictionary from YAML config
+    
     Returns:
-        bool: True si fichier existe
+        bool: True if file exists, False otherwise
     """
-    from datetime import datetime
-
+    if data_paths is None:
+        raise ValueError("data_paths must be provided")
     if hour == 'random':
         hour = 0
 
-    if data_paths is None:
-        raise ValueError("data_paths must be provided")
-
-    # Récupère le chemin racine pour la source de données
-    data_path = data_paths["GENERAL"].get(data_source.upper())
-    if not data_path:
-        raise ValueError(f"No path specified for {data_source} in data_paths")
-
     # NGCM
-    if data_source.lower() == "ngcm":
-        # On parcourt toutes les variables listées dans data_paths['NGCM']
-        for field, files in data_paths['NGCM'].items():
-            fp = get_ngcm_filepath(field, loaddate=datetime(year, month, day), loadtime=hour, fcst_dir=data_path)
+    if data_source.lower() == 'ngcm':
+        fcst_dir = data_paths['GENERAL']['NGCM']
+        # Parcours toutes les variables définies
+        for field in data_paths.get('NGCM', {}).keys():
+            fp = get_ngcm_filepath(field, loaddate=datetime(year, month, day), loadtime=hour, fcst_dir=fcst_dir)
             if os.path.isfile(fp):
                 return True
         return False
 
     # IMERG
-    elif data_source.lower() == "imerg":
-        for file_type in ['.HDF5', '.nc']:
-            fps = get_imerg_filepaths(year, month, day, hour, file_ending=file_type, imerg_data_dir=data_path)
-            if fps and os.path.isfile(fps[0]):
+    elif data_source.lower() == 'imerg':
+        imerg_dir = data_paths['GENERAL']['IMERG']
+        # Exemple minimal: fichiers .nc ou .HDF5
+        for ext in ['.nc', '.HDF5']:
+            filename = f"IMERG_{year}{month:02d}{day:02d}_{hour:02d}00{ext}"  # à adapter selon ta nomenclature
+            fp = os.path.join(imerg_dir, str(year), filename)
+            if os.path.isfile(fp):
                 return True
         return False
 
-    # IFS
-    elif data_source.lower() == "ifs":
-        fp = get_ifs_filepath('tp', loaddate=datetime(year, month, day), loadtime='12', fcst_dir=data_path)
-        return os.path.isfile(fp)
-
-    # ERA5
-    elif data_source.lower() == "era5":
-        era5_fp = get_era5_path('tp', year=year, month=month, era_data_dir=data_path)
-        return len(glob.glob(era5_fp)) > 0
-
-    # NIMROD
-    elif data_source.lower() == "nimrod":
-        glob_str = os.path.join(data_path, f"{year}/*.nc")
-        return len(glob.glob(glob_str)) > 0
-
     else:
-        raise ValueError(f"Unrecognised data source: {data_source}")
+        raise ValueError(f"Data source {data_source} not implemented in file_exists")
 
                 
 def filter_by_lat_lon(ds: xr.Dataset, 
