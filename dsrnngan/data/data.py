@@ -282,64 +282,126 @@ def get_dates(years, obs_data_source: str,
     return [item.strftime('%Y%m%d') for item in dates]
 
 ##🚩 add the code for ngcm 
-def file_exists(data_source: str, year: int,
-                month: int, day:int, hour='random',
-                data_paths=DATA_PATHS):
+# def file_exists(data_source: str, year: int,
+#                 month: int, day:int, hour='random',
+#                 data_paths=DATA_PATHS):
+#     """
+#     Check if file exists
+
+#     Args:
+#         data_source (str): Name of data source
+#         year (int): year
+#         month (int): month
+#         day (int): day
+#         data_paths (dict, optional): dict of data paths. Defaults to DATA_PATHS.
+
+#     Returns:
+#         bool: True if file exists
+#     """
+    
+#     if hour == 'random':
+#         hour = 0
+        
+#     data_path = data_paths["GENERAL"].get(data_source.upper()) 
+    
+#     if not data_path:
+#         raise ValueError(f'No path specified for {data_source} in data_paths')
+
+#     if data_source == 'nimrod':
+#         glob_str = os.path.join(data_path, f"{year}/*.nc")
+#         if len(glob(glob_str)) > 0:
+#             return True
+        
+#     elif data_source == 'imerg':
+#         for file_type in ['.HDF5', '.nc']:
+#             fps = get_imerg_filepaths(year, month, day, hour, file_ending=file_type, imerg_data_dir=data_path)
+#             if os.path.isfile(fps[0]):
+#                 return True
+
+#     elif data_source == 'ifs':
+#         fp = get_ifs_filepath('tp', loaddate=datetime(year, month, day), 
+#                                   loadtime='12', fcst_dir=data_path)
+#         if os.path.isfile(fp):
+#             return True
+#     elif data_source == 'ngcm':
+#         fp = get_ngcm_filepath('precipitation_cumulative_mean', loaddate=datetime(year, month, day),
+#                                   loadtime=hour, fcst_dir=data_path)
+#         if os.path.isfile(fp):
+#             return True
+
+#     elif data_source == 'era5':
+#         # These are just meaningless dates to get the filepath 
+#         ##🚩 I need to make sure that the name of the total precipitation in the era 5 is called like this 
+#         era5_fp = get_era5_path('tp', year=year, month=month, era_data_dir=data_path)
+#         glob_str = era5_fp
+#         if len(glob(glob_str)) > 0:
+#             return True
+#     else:
+#         raise ValueError(f'Unrecognised data source: {data_source}')
+    
+#     return False
+
+def file_exists(data_source: str, year: int, month: int, day: int, hour='random', data_paths=None):
     """
-    Check if file exists
+    Vérifie si un fichier existe pour la date donnée selon le data_source.
 
     Args:
-        data_source (str): Name of data source
-        year (int): year
-        month (int): month
-        day (int): day
-        data_paths (dict, optional): dict of data paths. Defaults to DATA_PATHS.
+        data_source (str): 'ngcm', 'imerg', 'ifs', 'era5', 'nimrod'
+        year, month, day (int)
+        hour (int or 'random'): heure du forecast
+        data_paths (dict): dictionnaire des chemins
 
     Returns:
-        bool: True if file exists
+        bool: True si fichier existe
     """
-    
+    from datetime import datetime
+
     if hour == 'random':
         hour = 0
-        
-    data_path = data_paths["GENERAL"].get(data_source.upper()) 
-    
-    if not data_path:
-        raise ValueError(f'No path specified for {data_source} in data_paths')
 
-    if data_source == 'nimrod':
-        glob_str = os.path.join(data_path, f"{year}/*.nc")
-        if len(glob(glob_str)) > 0:
-            return True
-        
-    elif data_source == 'imerg':
+    if data_paths is None:
+        raise ValueError("data_paths must be provided")
+
+    # Récupère le chemin racine pour la source de données
+    data_path = data_paths["GENERAL"].get(data_source.upper())
+    if not data_path:
+        raise ValueError(f"No path specified for {data_source} in data_paths")
+
+    # NGCM
+    if data_source.lower() == "ngcm":
+        # On parcourt toutes les variables listées dans data_paths['NGCM']
+        for field, files in data_paths['NGCM'].items():
+            fp = get_ngcm_filepath(field, loaddate=datetime(year, month, day), loadtime=hour, fcst_dir=data_path)
+            if os.path.isfile(fp):
+                return True
+        return False
+
+    # IMERG
+    elif data_source.lower() == "imerg":
         for file_type in ['.HDF5', '.nc']:
             fps = get_imerg_filepaths(year, month, day, hour, file_ending=file_type, imerg_data_dir=data_path)
-            if os.path.isfile(fps[0]):
+            if fps and os.path.isfile(fps[0]):
                 return True
+        return False
 
-    elif data_source == 'ifs':
-        fp = get_ifs_filepath('tp', loaddate=datetime(year, month, day), 
-                                  loadtime='12', fcst_dir=data_path)
-        if os.path.isfile(fp):
-            return True
-    elif data_source == 'ngcm':
-        fp = get_ngcm_filepath('precipitation_cumulative_mean', loaddate=datetime(year, month, day),
-                                  loadtime=hour, fcst_dir=data_path)
-        if os.path.isfile(fp):
-            return True
+    # IFS
+    elif data_source.lower() == "ifs":
+        fp = get_ifs_filepath('tp', loaddate=datetime(year, month, day), loadtime='12', fcst_dir=data_path)
+        return os.path.isfile(fp)
 
-    elif data_source == 'era5':
-        # These are just meaningless dates to get the filepath 
-        ##🚩 I need to make sure that the name of the total precipitation in the era 5 is called like this 
+    # ERA5
+    elif data_source.lower() == "era5":
         era5_fp = get_era5_path('tp', year=year, month=month, era_data_dir=data_path)
-        glob_str = era5_fp
-        if len(glob(glob_str)) > 0:
-            return True
+        return len(glob.glob(era5_fp)) > 0
+
+    # NIMROD
+    elif data_source.lower() == "nimrod":
+        glob_str = os.path.join(data_path, f"{year}/*.nc")
+        return len(glob.glob(glob_str)) > 0
+
     else:
-        raise ValueError(f'Unrecognised data source: {data_source}')
-    
-    return False
+        raise ValueError(f"Unrecognised data source: {data_source}")
+
                 
 def filter_by_lat_lon(ds: xr.Dataset, 
                       lon_range: list, 
@@ -1547,7 +1609,8 @@ def get_imerg_filepaths(year: int, month: int, day: int,
     imerg_file_path=os.path.join(imerg_data_dir, year_str, file_name)        
     
     return [imerg_file_path]
-    
+ 
+  ##🚩this function need to be check    
 def load_imerg_raw(year: int, month: int, day: int, 
                    hour:int, latitude_vals: list=None, 
                    longitude_vals: list=None,
