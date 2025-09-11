@@ -996,11 +996,11 @@ def load_ngcm_raw(field: str,
     ds = xr.open_dataset(fp)
     var_names = list(ds.data_vars)
     
-    if np.round(ds.longitude.values.max(), 6) < np.round(max(longitude_vals), 6) or np.round(ds.longitude.values.min(), 6) > np.round(min(longitude_vals), 6):
-        raise ValueError('Longitude range outside of data range')
+    # if np.round(ds.longitude.values.max(), 6) < np.round(max(longitude_vals), 6) or np.round(ds.longitude.values.min(), 6) > np.round(min(longitude_vals), 6):
+    #     raise ValueError('Longitude range outside of data range')
     
-    if np.round(ds.latitude.values.max(), 6) < np.round(max(latitude_vals),6) or np.round(ds.latitude.values.min(),6) > np.round(min(latitude_vals), 6):
-        raise ValueError('Latitude range outside of data range')
+    # if np.round(ds.latitude.values.max(), 6) < np.round(max(latitude_vals),6) or np.round(ds.latitude.values.min(),6) > np.round(min(latitude_vals), 6):
+    #     raise ValueError('Latitude range outside of data range')
     
     assert len(var_names) == 1, ValueError('More than one variable found; cannot automatically infer variable name')
     var_name = list(ds.data_vars)[0]
