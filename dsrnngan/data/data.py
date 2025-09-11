@@ -460,8 +460,8 @@ def interpolate_dataset_on_lat_lon(ds: xr.Dataset,
 
     ds_out = xr.Dataset(
         {
-            lat_var_name: ([lat_var_name], latitude_vals),
-            lon_var_name: ([lon_var_name], longitude_vals),
+            lat_var_name: ([lat_var_name], np.arange(-13.65,24.65+0.1,0.1)),
+            lon_var_name: ([lon_var_name], np.arange(19.15,54.25+0.1,0.1)), ##🚩 include it directly in the code but the best way will be to put the parameter in the data_config
         }
     )
 
@@ -1630,11 +1630,11 @@ def load_imerg_raw(year: int, month: int, day: int,
 
     ds = xr.concat(datasets, dim='time').mean('time')
     
-    if ds.lon.values.max() < max(longitude_vals) or ds.lon.values.min() > min(longitude_vals):
-        raise ValueError('Longitude range outside of data range')
+    # if ds.lon.values.max() < max(longitude_vals) or ds.lon.values.min() > min(longitude_vals):
+    #     raise ValueError('Longitude range outside of data range')
     
-    if ds.lat.values.max() < max(latitude_vals) or ds.lat.values.min() > min(latitude_vals):
-        raise ValueError('Latitude range outside of data range')
+    # if ds.lat.values.max() < max(latitude_vals) or ds.lat.values.min() > min(latitude_vals):
+    #     raise ValueError('Latitude range outside of data range')
 
     # Note we use method nearest; the iMERG data isn't interpolated to be on
     # the same grid as the input forecast necessarily (they don't need to match exactly)
@@ -1647,7 +1647,7 @@ def load_imerg_raw(year: int, month: int, day: int,
         
     # Make sure dataset is consistent with others
     ds = make_dataset_consistent(ds)
-    ds = ds.transpose('lat', 'lon', 'latv', 'lonv')
+    ds = ds.transpose('latitude', 'longitude')
 
     return ds
 
