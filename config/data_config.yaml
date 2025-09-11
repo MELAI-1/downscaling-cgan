@@ -141,17 +141,17 @@ paths:
           STATS: '/home/melvin_aims_ac_za/data/constants/neuralgcm_Horn_Africa_2018_stats.pkl' ##🚩 I add this path for the statistics 
           
       NGCM:
-      evaporation: []
-      precipitation_cumulative_mean: []
-      specific_cloud_ice_water_content_500: []
-      specific_cloud_ice_water_content_700: []
-      specific_cloud_ice_water_content_850: []
-      u_component_of_wind_500: []
-      u_component_of_wind_700: []
-      u_component_of_wind_850: []
-      v_component_of_wind_500: []
-      v_component_of_wind_700: []
-      v_component_of_wind_850: []
+          evaporation: []
+          precipitation_cumulative_mean: []
+          specific_cloud_ice_water_content_500: []
+          specific_cloud_ice_water_content_700: []
+          specific_cloud_ice_water_content_850: []
+          u_component_of_wind_500: []
+          u_component_of_wind_700: []
+          u_component_of_wind_850: []
+          v_component_of_wind_500: []
+          v_component_of_wind_700: []
+          v_component_of_wind_850: []
       TFRecords:
           # tfrecords_path: '/user/work/uz22147/tfrecords/'
           tfrecords_path: '/home/melvin_aims_ac_za/data/tfrecords' ##🚩 need to change the tfrecord path
