@@ -68,7 +68,7 @@ class DataGenerator(Sequence):
         self.shuffle = shuffle
         self.hour = hour
         self.normalise_inputs = data_config.normalise_inputs
-        self.normalisation_strategy = {field: data_config.input_normalisation_strategy[re.sub(r'([0-9]*[a-z]+)[0-9]*', r'\1', field)] for field in self.fcst_fields}
+        self.normalisation_strategy = {field: data_config.ngcm_input_normalisation_strategy[re.sub(r'([0-9]*[a-z]+)[0-9]*', r'\1', field)] for field in self.fcst_fields}
         self.output_normalisation = data_config.output_normalisation
 
         self.downsample = downsample
