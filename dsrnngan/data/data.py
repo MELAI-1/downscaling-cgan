@@ -356,6 +356,7 @@ def file_exists(data_source: str, year: int, month: int, day: int, hour='random'
         fcst_dir = data_paths['GENERAL'].get('NGCM')
         for field in data_paths.get('NGCM', {}).keys():
             fp = get_ngcm_filepath(field, loaddate=datetime(year, month, day), loadtime=hour, fcst_dir=fcst_dir)
+            print(fp)  # Debugging line to print the filepath being checked
             if os.path.isfile(fp):
                 return True
         return False
@@ -770,7 +771,7 @@ def get_ngcm_filepath(field: str, loaddate: datetime,
     year = loaddate.year
     
     # Generate filename with the new structure
-    filename = f"{field}_{year}_ngcm_{field}_2.8deg_6h_GHA_{loaddate.strftime('%Y%m%d')}_{loadtime}h.nc"
+    filename = f"{field}_{year}_ngcm_{field}_2.8deg_6h_GHA_{loaddate.strftime('%Y%m%d')}_{loadtime:02d}h.nc"
 
     # Use the full field as the top-level folder (no normalization needed here)
     variable_folder = field
