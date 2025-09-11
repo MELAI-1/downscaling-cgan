@@ -1118,7 +1118,7 @@ def load_ngcm(field: str,
     if isinstance(date, str):
         date = datetime.strptime(date, "%Y%m%d")
         
-    ds = load_ngcm_raw(field, date.year, date.month, date.day, hour, ifs_data_dir=fcst_dir,
+    ds = load_ngcm_raw(field, date.year, date.month, date.day, hour, ngcm_data_dir=fcst_dir,
                       latitude_vals=latitude_vals, longitude_vals=longitude_vals, interpolate=True)
     
     var_name = list(ds.data_vars)[0]
