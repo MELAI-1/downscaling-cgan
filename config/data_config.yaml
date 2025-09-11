@@ -137,7 +137,7 @@ paths:
           LAKES: '/bp1/geog-tropical/users/uz22147/east_africa_data/constants/lake_mask.nc'
           SEA: '/bp1/geog-tropical/users/uz22147/east_africa_data/constants/sea_mask.nc'
           CONSTANTS: '/home/melvin_aims_ac_za/data/constants/'
-          NGCM: '/home/melvin_aims_ac_za/data/NGCM' ##🚩
+          NGCM: '/home/melvin_aims_ac_za/data/NGCM/evaporation' ##🚩
           STATS: '/home/melvin_aims_ac_za/data/constants/neuralgcm_Horn_Africa_2018_stats.pkl' ##🚩 I add this path for the statistics 
           
       TFRecords:
@@ -159,3 +159,10 @@ paths:
           # bucket_paths:
           #   GCS_EXEMPLE: 'gs://melvin_aims_bucket/mon-dossier/mon-fichier.nc'
           #   AZURE_EXEMPLE: 'https://moncompte.blob.core.windows.net/moncontainer/monfichier.nc'
+
+
+    
+
+    #execution code 
+
+# python -m dsrnngan.data.tfrecords_generator   --records-folder '/home/melvin_aims_ac_za/data/tfrecords' --fcst-hours  0 6 12 18 --data-config-path '/home/melvin_aims_ac_za/downscaling-cgan/config/data_config.yaml' --model-config-path '/home/melvin_aims_ac_za/downscaling-cgan/config/model_config.yaml'
