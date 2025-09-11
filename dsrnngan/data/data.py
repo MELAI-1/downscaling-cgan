@@ -1039,7 +1039,7 @@ def load_ngcm_raw(field: str,
             ds = ds.sel(latitude=latitude_vals, method='backfill')
     
     ds = make_dataset_consistent(ds)
-    ds = ds.transpose('latitude', 'longitude')
+    ds = ds.isel(surface=0).transpose('latitude', 'longitude')
              
     return ds
 
