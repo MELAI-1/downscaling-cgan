@@ -778,8 +778,8 @@ def get_ngcm_filepath(field: str, loaddate: datetime,
     """
     # Extract year from loaddate for the filename and subdirectory
     year = loaddate.year
-    print(loaddate)
-    print(loadtime)
+    # print(loaddate)
+    # print(loadtime)
     
     # Generate filename with the new structure
     filename = f"{field}_{year}_ngcm_{field}_2.8deg_6h_GHA_{loaddate.strftime('%Y%m%d')}_{loadtime:02d}h.nc"
@@ -1023,7 +1023,7 @@ def load_ngcm_raw(field: str,
     # if var_name in cumuative_fields:
         # Output rainfall during the following hour
         # ds =  ds.sel(date=t_plus_one) - ds.sel(date=t)   ##🚩🚩 change time to date
-    ds=ds.isel(time=-1)  ##🚩🚩 change time to date
+    # ds=ds.isel(time=-1)  ##🚩🚩 change time to date
    
     if latitude_vals is not None and longitude_vals is not None:
         if interpolate:
