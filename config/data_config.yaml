@@ -267,12 +267,28 @@ ngcm_input_normalisation_strategy:
     precipitation_cumulative_mean:  
       negative_vals: False
       normalisation: "log"
-    specific_cloud_ice_water_content:
+    specific_cloud_ice_water_content_500:
       negative_vals: False
       normalisation: "log"
-    u_component_of_wind:
+    specific_cloud_ice_water_content_700:
+      negative_vals: False
+      normalisation: "log"
+    specific_cloud_ice_water_content_850:
+      negative_vals: False
+      normalisation: "log"
+
+    u_component_of_wind_500:
       normalisation: "minmax"
-    v_component_of_wind:
+    u_component_of_wind_700:
+      normalisation: "minmax"
+    u_component_of_wind_850:
+      normalisation: "minmax"
+
+    v_component_of_wind_500:
+      normalisation: "minmax"
+    v_component_of_wind_700:
+      normalisation: "minmax"
+    v_component_of_wind_850:
       normalisation: "minmax"
 
 paths:
