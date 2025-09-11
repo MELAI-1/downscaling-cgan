@@ -343,43 +343,30 @@ def get_dates(years, obs_data_source: str,
 
 
 def file_exists(data_source: str, year: int, month: int, day: int, hour='random', data_paths=None):
-    """
-    Check if a file exists for the given data source and date.
-    
-    Args:
-        data_source (str): 'ngcm' or 'imerg'
-        year, month, day (int): date
-        hour (int or 'random'): forecast hour
-        data_paths (dict): dictionary from YAML config
-    
-    Returns:
-        bool: True if file exists, False otherwise
-    """
+    from datetime import datetime
+    import os
+
     if data_paths is None:
         raise ValueError("data_paths must be provided")
     if hour == 'random':
         hour = 0
 
-    # NGCM
+    # 🔹 NGCM
     if data_source.lower() == 'ngcm':
-        fcst_dir = data_paths['GENERAL']['NGCM']
-        # Parcours toutes les variables définies
+        fcst_dir = data_paths['GENERAL'].get('NGCM')
         for field in data_paths.get('NGCM', {}).keys():
             fp = get_ngcm_filepath(field, loaddate=datetime(year, month, day), loadtime=hour, fcst_dir=fcst_dir)
             if os.path.isfile(fp):
                 return True
         return False
 
-    # IMERG
+    # 🔹 IMERG
     elif data_source.lower() == 'imerg':
         imerg_dir = data_paths['GENERAL']['IMERG']
-        # Exemple minimal: fichiers .nc ou .HDF5
-        for ext in ['.nc', '.HDF5']:
-            filename = f"IMERG_{year}{month:02d}{day:02d}_{hour:02d}00{ext}"  # à adapter selon ta nomenclature
-            fp = os.path.join(imerg_dir, str(year), filename)
-            if os.path.isfile(fp):
-                return True
-        return False
+        year_dir = os.path.join(imerg_dir, str(year))
+        filename = f"{year}{month:02d}{day:02d}_{hour:02d}.nc"
+        full_path = os.path.join(year_dir, filename)
+        return os.path.isfile(full_path)
 
     else:
         raise ValueError(f"Data source {data_source} not implemented in file_exists")

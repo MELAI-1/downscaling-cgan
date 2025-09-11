@@ -31,7 +31,8 @@ def file_exists(data_source: str, year: int, month: int, day: int, hour='random'
 # 🔹 Définir les chemins pour tester
 DATA_PATHS = {
     "GENERAL": {
-        "NGCM": "/home/melvin_aims_ac_za/data/NGCM"
+        "NGCM": "/home/melvin_aims_ac_za/data/NGCM",
+        "IMERG": "/home/melvin_aims_ac_za/data/IMERG",
     },
     "NGCM": {
         "evaporation": []  # on peut laisser vide, on utilise get_ngcm_filepath
@@ -41,3 +42,4 @@ DATA_PATHS = {
 # 🔹 Tester
 exists = file_exists("ngcm", 2020, 12, 27, hour=0, data_paths=DATA_PATHS)
 print("Fichier NGCM trouvé :", exists)
+
