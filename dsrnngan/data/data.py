@@ -450,6 +450,10 @@ def interpolate_dataset_on_lat_lon(ds: xr.Dataset,
     min_actual_lon = min(ds.coords[lon_var_name].values)
     max_actual_lon = max(ds.coords[lon_var_name].values)
 
+    print(f'Actual lat range: {min_actual_lat} to {max_actual_lat}')
+    print(f'Actual lon range: {min_actual_lon} to {max_actual_lon}')
+    print(f'Required lat range: {min_lat} to {max_lat}')
+    print(f'Required lon range: {min_lon} to {max_lon}')
     if not ((min_actual_lat < min_lat < max_actual_lat) and (min_actual_lon < min_lon < max_actual_lon)
             and (min_actual_lat < max_lat < max_actual_lat) and (min_actual_lon < max_lon < max_actual_lon)):
         raise ValueError('Larger buffer area needed to ensure good interpolation')
