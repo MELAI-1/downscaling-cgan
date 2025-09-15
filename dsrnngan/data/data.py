@@ -581,7 +581,8 @@ def load_orography(filepath: str=OROGRAPHY_PATH,
     
     # Note that this assumes the orography is somewhat filtered already 
     # If it is worldwide orography then normalised values will probably be too small!
-    max_val = ds['h'].values.max()
+    ##🚩max_val = ds['h'].values.max()
+    max_val = ds['elevation'].values.max()
        
     if latitude_vals is not None and longitude_vals is not None:
         if interpolate:
@@ -594,7 +595,8 @@ def load_orography(filepath: str=OROGRAPHY_PATH,
     ds = make_dataset_consistent(ds)
 
     # Normalise and clip below to remove spectral artefacts
-    h_vals = ds['h'].values[0, :, :]
+    h_vals = ds['elevation'].values[ :, :]
+   # h_vals = ds['elevation'].values[0, :, :] ##🚩 change this
     h_vals[h_vals < 5] = 5.0
     h_vals = h_vals / max_val
 
@@ -633,7 +635,8 @@ def load_land_sea_mask(filepath=LSM_PATH,
             
     ds = make_dataset_consistent(ds)
     
-    lsm = ds['lsm'].values[0, :, :]
+    #lsm = ds['lsm'].values[0, :, :] ##🚩
+    lsm = ds['lsm'].values[ :, :]
     
     ds.close()
     
