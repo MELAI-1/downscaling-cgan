@@ -123,6 +123,7 @@ class DataGenerator(Sequence):
             output_normalisation=self.output_normalisation,
             latitude_range=self.latitude_range,
             longitude_range=self.longitude_range)
+        print(f"Loaded data_x_batch shape: {data_x_batch.shape}, data_y_batch shape: {data_y_batch.shape}")
         
         if self.downsample:
             # replace forecast data by coarsened radar data!
