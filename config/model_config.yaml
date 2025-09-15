@@ -11,7 +11,7 @@ downscaling_factor: 1  # increase in image size in each dimension
 downscaling_steps: [1]  # list of integers that multiply to the downscaling factor; the generator will use UpSampling2D layers of these sizes, alternating with residual blocks.
 
 generator:
-    filters_gen: 64
+    filters_gen: 128
     noise_channels: 4 # used for GAN
     latent_variables: 1 # used for VAEGAN
     learning_rate_gen: 1e-5
@@ -22,7 +22,7 @@ discriminator:
 
 train:
     # training_range: ['201603', '201802'] # Start and end of training period, in YYYYMM format 
-    training_range: ['200101', '200201'] # Start and end of training period, in YYYYMM format
+    training_range: ['200101', '200102'] # Start and end of training period, in YYYYMM format
 
     training_weights: [0.25, 0.25, 0.25, 0.25]
     num_epochs: 5
@@ -30,9 +30,9 @@ train:
     batch_size: 2  # can use 400x16 without CL, or 3200x2 with CL
     kl_weight: 1e-8  # used for VAEGAN
     ensemble_size: 8  # size of pred ensemble for content loss
-    CL_type: "ensmeanMSE" # type of content loss to use: 'CRPS', 'CRPS_phys', 'ensmeanMSE', 'ensmeanMSE_phys'
+    CL_type: "ensmeanMSE" # type of content loss to use: 'CRPS', 'CRPS_phys', 'ensmeanMSE', 'ensmeanMSE_phys' # we can change it after for the evaluation part
     content_loss_weight: 1000.0
-    img_chunk_width: 200
+    img_chunk_width: 352
 
 val:
     val_range: ['201806', '201905'] # cannot pass a list if using create_fixed_dataset
