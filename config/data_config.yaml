@@ -196,6 +196,9 @@ max_latitude: 29
 latitude_step_size: 2.8
 min_longitude: 16
 max_longitude: 60
+
+
+
 longitude_step_size: 2.8
 
 input_fields: 
@@ -297,8 +300,8 @@ paths:
       IMERG: '/home/melvin_aims_ac_za/data/IMERG'
       ERA5: '/bp1/geog-tropical/data/ERA-5/day'
       IFS: '/bp1/geog-tropical/users/uz22147/east_africa_data/IFS'
-      OROGRAPHY: '/home/melvin_aims_ac_za/data/constants/h_HRES_EAfrica.nc'
-      LSM: '/home/melvin_aims_ac_za/data/constants/lsm_HRES_EAfrica.nc'
+      OROGRAPHY: '/home/melvin_aims_ac_za/data/constants/elev.nc'
+      LSM: '/home/melvin_aims_ac_za/data/constants/lsm.nc'
       LAKES: '/bp1/geog-tropical/users/uz22147/east_africa_data/constants/lake_mask.nc'
       SEA: '/bp1/geog-tropical/users/uz22147/east_africa_data/constants/sea_mask.nc'
       CONSTANTS: '/home/melvin_aims_ac_za/data/constants/'
