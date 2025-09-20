@@ -705,8 +705,9 @@ def write_train_test_data(*args, training_range,
                data_label='train', **kwargs)
     
     if validation_range:
-        write_data(training_range, *args,
-               data_label='train', **kwargs)
+        print('\n*** Writing validation data')
+        write_data(validation_range, *args,
+               data_label='validation', **kwargs)
         
     if test_range:
         print('\n*** Writing test data')

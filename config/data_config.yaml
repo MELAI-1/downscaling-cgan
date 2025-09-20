@@ -324,8 +324,3 @@ paths:
     TFRecords:
       tfrecords_path: '/home/melvin_aims_ac_za/data/tfrecords'
 
-train:
-  training_range: ['202012', '202012']
-
-val:
-  val_range: ['202012', '202012']
