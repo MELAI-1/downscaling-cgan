@@ -441,6 +441,7 @@ def write_data(year_month_ranges: list,
                                 shuffle=False,
                                 hour=hour)
             print('Fetching batches')
+            dates = np.random.choice(np.asarray(dates),size=100,replace=False)
             for batch, date in tqdm(enumerate(dates), total=len(dates), position=0, leave=True):
                 
                 logger.debug(f"hour={hour}, batch={batch}")
