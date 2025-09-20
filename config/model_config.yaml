@@ -34,7 +34,7 @@ train:
     content_loss_weight: 1000.0
     img_chunk_width: 352
 
-val:
-    val_range: ['201806', '201905'] # cannot pass a list if using create_fixed_dataset
-    val_size: 100
-    ensemble_size: 20
+# val:
+#     val_range: ['201806', '201905'] # cannot pass a list if using create_fixed_dataset
+#     val_size: 100
+#     ensemble_size: 20
