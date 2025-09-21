@@ -705,16 +705,16 @@ def write_train_test_data(*args, training_range,
     write_data(training_range, *args,
                data_label='train', **kwargs)
     
-    if validation_range:
-        print('\n*** Writing validation data')
-        write_data(validation_range, *args,
-               data_label='validation', **kwargs)
+    # if validation_range:
+    #     print('\n*** Writing validation data')
+    #     write_data(validation_range, *args,
+    #            data_label='validation', **kwargs)
         
-    if test_range:
-        print('\n*** Writing test data')
+    # if test_range:
+    #     print('\n*** Writing test data')
 
-        write_data(test_range, *args,
-                   data_label='test', **kwargs)
+    #     write_data(test_range, *args,
+    #                data_label='test', **kwargs)
 
 
 def save_dataset(tfrecords_dataset, flename, max_batches=None):
