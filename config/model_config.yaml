@@ -22,7 +22,7 @@ discriminator:
 
 train:
     # training_range: ['201603', '201802'] # Start and end of training period, in YYYYMM format 
-    training_range: ['200101', '200112'] # Start and end of training period, in YYYYMM format
+    training_range: ['200201', '200331'] # Start and end of training period, in YYYYMM format
 
     training_weights: [0.25, 0.25, 0.25, 0.25]
     num_epochs: 5
