@@ -342,6 +342,171 @@ def create_fixed_dataset(year: int=None,
 def _float_feature(list_of_floats: list):  # float32
     return tf.train.Feature(float_list=tf.train.FloatList(value=list_of_floats))
 
+# def write_data(year_month_ranges: list,
+#                data_label: str,
+#                hours: list,
+#                data_config: dict=None,
+#                debug: bool=False,
+#                num_shards: int=1) -> str:
+#     """
+#     Function to write training data to TF records
+
+#     Args:
+#         year_month_range (list): List of date strings in YYYYMM format, or a list of lists of date strings for non contiguous date ranges. The code will take all dates between the maximum and minimum year months (inclusive)
+#         data_label (str): Label to assign to data (e.g. train, validate)
+#         forecast_data_source (str): Source of forecast data (e.g. ifs)
+#         observational_data_source (str): Source of observational data (e.g. imerg)
+#         hours (list): List of hours to include
+#         data_paths (dict, optional): Dict of paths to the data sources. Defaults to DATA_PATHS.
+#         longitude_range (list, optional): Longitude range to use. Defaults to None.
+#         debug (bool, optional): Debug mode. Defaults to False.
+#         config (dict, optional): Config dict. Defaults to None. If None then will read from default config location
+#         num_shards (int, optional): Number of shards to split each tfrecord into (to make sure records are not too big)
+
+#     Returns:
+#         str: Name of directory that records have been written to
+#     """
+
+#     from .data_generator import DataGenerator
+#     logger.info('Start of write data')
+#     logger.info(locals())
+    
+#     if not data_config:
+#         data_config = read_config.read_config(config_filename='data_config.yaml')
+#         print('No config provided, reading from default location') ###🚩 add this print statement
+
+#     data_paths=get_data_paths(data_config=data_config)
+#     records_folder = data_paths['TFRecords']["tfrecords_path"]
+#     if not os.path.isdir(records_folder):
+#         os.makedirs(records_folder, exist_ok=True)
+    
+#     #  Create directory that is hash of setup params, so that we know it's the right data later on
+#     data_config_dict = utils.convert_namespace_to_dict(data_config)
+#     # hash_dir = os.path.join(records_folder, hash_dict(data_config_dict))
+#     hash_dir = os.path.join(records_folder, 'final_tfrecord/')  ##🚩 change here to final for the time being)
+    
+#     if not os.path.isdir(hash_dir):
+#         os.makedirs(hash_dir, exist_ok=True)
+    
+#     print(f'Output folder will be {hash_dir}')
+        
+#     # Write params in directory
+#     write_to_yaml(os.path.join(hash_dir, 'data_config.yaml'), data_config_dict)
+    
+#     with open(os.path.join(hash_dir, 'git_commit.txt'), 'w+') as ofh:
+#         repo = git.Repo(search_parent_directories=True)
+#         sha = repo.head.object.hexsha
+#         ofh.write(sha)
+    
+#     if isinstance(year_month_ranges[0], str):
+#         year_month_ranges = [year_month_ranges]
+    
+#     # Create file handles
+#     fle_hdles = {}
+#     for hour in hours:
+#         fle_hdles[hour] = {}
+#         for cl in range(data_config.num_classes):
+#             fle_hdles[hour][cl] = []
+#             for shard in range(num_shards):
+#                 flename = os.path.join(hash_dir, f"{data_label}_{hour}.{cl}.{shard}.tfrecords")
+#                 fle_hdles[hour][cl].append(tf.io.TFRecordWriter(flename))
+    
+#     for year_month_range in year_month_ranges:  
+        
+#         dates = date_range_from_year_month_range(year_month_range)
+#         start_date = dates[0]
+#         dates = [item for item in dates if file_exists(data_source=data_config.fcst_data_source, year=item.year,
+#                                                             month=item.month, day=item.day,
+#                                                             data_paths=data_paths)]
+#         if dates:
+            
+#             if not dates[0] == start_date and not debug:
+#                 # Means there likely isn't forecast data for the day before
+#                 dates = dates[1:]
+        
+            
+#             if data_config.class_bin_boundaries is not None:
+#                 print(f'Data will be bundled according to class bin boundaries provided: {data_config.class_bin_boundaries}')
+#                 num_class = len(data_config.class_bin_boundaries) + 1
+
+#             if debug:
+#                 dates = dates[:1]
+            
+#             for hour in hours: 
+#                 print('Hour = ', hour)
+#                 dgc = DataGenerator(data_config=data_config,
+#                                 dates=[item.strftime('%Y%m%d') for item in dates],
+#                                 batch_size=1,
+#                                 shuffle=False,
+#                                 hour=hour)
+#                 print('Fetching batches')
+#                 dates = np.random.choice(np.asarray(dates),size=100,replace=False)
+#                 for batch, date in tqdm(enumerate(dates), total=len(dates), position=0, leave=True):
+#                     logger.debug(f"hour={hour}, batch={batch}")
+#                     try:
+#                         sample = dgc.__getitem__(batch)
+#                         (depth, width, height) = sample[1]['output'].shape
+                        
+#                         for k in range(depth):
+#                             observations = sample[1]['output'][k,...].flatten()
+#                             forecast = sample[0]['lo_res_inputs'][k,...].flatten()
+#                             const = sample[0]['hi_res_inputs'][k,...].flatten()
+
+#                         # Check no Null values
+#                             if np.isnan(observations).any() or np.isnan(forecast).any() or np.isnan(const).any():
+#                                 raise ValueError('Unexpected NaN values in data')
+                            
+#                             # Check for empty data
+#                             if forecast.sum() == 0 or const.sum() == 0:
+#                                 raise ValueError('one or more of arrays is all zeros')
+                        
+#                         # Check hi res data has same dimensions
+                            
+#                             feature = {
+#                                 'generator_input': _float_feature(forecast),
+#                                 'constants': _float_feature(const),
+#                                 'generator_output': _float_feature(observations)
+#                             }
+
+#                             features = tf.train.Features(feature=feature)
+#                             example = tf.train.Example(features=features)
+#                             example_to_string = example.SerializeToString()
+                        
+#                         # If provided, bin data according to bin boundaries (typically quartiles)
+#                             if data_config.class_bin_boundaries is not None:
+                                                        
+#                                 threshold = 0.1
+#                                 if data_config.output_normalisation is not None:
+#                                     rainy_pixel_fraction = (denormalise(observations, normalisation_type=data_config.output_normalisation) > threshold).mean()
+#                                 else:
+#                                     rainy_pixel_fraction = (observations > threshold).mean()
+
+#                                 clss = np.digitize(rainy_pixel_fraction, right=False)
+                                
+#                             else:
+#                                 clss = random.choice(range(data_config.num_classes))
+                                
+#                             # Choose random shard
+#                             fh = random.choice(fle_hdles[hour][clss])
+
+#                             fh.write(example_to_string)
+                    
+#                     except FileNotFoundError as e:
+#                         print(f"Error loading hour={hour}, date={date}")
+                    
+                
+#         else:
+#             print('No dates found')
+            
+#     for hour in hours:
+#         for cl, fhs in fle_hdles[hour].items():
+#             for fh in fhs:
+#                 fh.close()
+    
+                            
+#     return hash_dir
+
+
 def write_data(year_month_ranges: list,
                data_label: str,
                hours: list,
@@ -352,16 +517,12 @@ def write_data(year_month_ranges: list,
     Function to write training data to TF records
 
     Args:
-        year_month_range (list): List of date strings in YYYYMM format, or a list of lists of date strings for non contiguous date ranges. The code will take all dates between the maximum and minimum year months (inclusive)
+        year_month_ranges (list): List of date strings in YYYYMM format, or a list of lists of date strings for non contiguous date ranges.
         data_label (str): Label to assign to data (e.g. train, validate)
-        forecast_data_source (str): Source of forecast data (e.g. ifs)
-        observational_data_source (str): Source of observational data (e.g. imerg)
         hours (list): List of hours to include
-        data_paths (dict, optional): Dict of paths to the data sources. Defaults to DATA_PATHS.
-        longitude_range (list, optional): Longitude range to use. Defaults to None.
+        data_config (dict, optional): Config dict. Defaults to None. If None then will read from default config location
         debug (bool, optional): Debug mode. Defaults to False.
-        config (dict, optional): Config dict. Defaults to None. If None then will read from default config location
-        num_shards (int, optional): Number of shards to split each tfrecord into (to make sure records are not too big)
+        num_shards (int, optional): Number of shards to split each tfrecord into
 
     Returns:
         str: Name of directory that records have been written to
@@ -373,17 +534,16 @@ def write_data(year_month_ranges: list,
     
     if not data_config:
         data_config = read_config.read_config(config_filename='data_config.yaml')
-        print('No config provided, reading from default location') ###🚩 add this print statement
+        print('No config provided, reading from default location')
 
-    data_paths=get_data_paths(data_config=data_config)
+    data_paths = get_data_paths(data_config=data_config)
     records_folder = data_paths['TFRecords']["tfrecords_path"]
     if not os.path.isdir(records_folder):
         os.makedirs(records_folder, exist_ok=True)
     
-    #  Create directory that is hash of setup params, so that we know it's the right data later on
+    # Create directory that is hash of setup params
     data_config_dict = utils.convert_namespace_to_dict(data_config)
-    # hash_dir = os.path.join(records_folder, hash_dict(data_config_dict))
-    hash_dir = os.path.join(records_folder, 'final_tfrecord/')  ##🚩 change here to final for the time being)
+    hash_dir = os.path.join(records_folder, 'final_tfrecord/')
     
     if not os.path.isdir(hash_dir):
         os.makedirs(hash_dir, exist_ok=True)
@@ -412,20 +572,15 @@ def write_data(year_month_ranges: list,
                 fle_hdles[hour][cl].append(tf.io.TFRecordWriter(flename))
     
     for year_month_range in year_month_ranges:  
-        
         dates = date_range_from_year_month_range(year_month_range)
         start_date = dates[0]
         dates = [item for item in dates if file_exists(data_source=data_config.fcst_data_source, year=item.year,
-                                                            month=item.month, day=item.day,
-                                                            data_paths=data_paths)]
+                                                      month=item.month, day=item.day,
+                                                      data_paths=data_paths)]
         if dates:
-            
-                
             if not dates[0] == start_date and not debug:
-                # Means there likely isn't forecast data for the day before
                 dates = dates[1:]
         
-            
             if data_config.class_bin_boundaries is not None:
                 print(f'Data will be bundled according to class bin boundaries provided: {data_config.class_bin_boundaries}')
                 num_class = len(data_config.class_bin_boundaries) + 1
@@ -433,73 +588,66 @@ def write_data(year_month_ranges: list,
             if debug:
                 dates = dates[:1]
                 
-            print('Hour = ', hour)
-
-            dgc = DataGenerator(data_config=data_config,
-                                dates=[item.strftime('%Y%m%d') for item in dates],
-                                batch_size=1,
-                                shuffle=False,
-                                hour=hour)
-            print('Fetching batches')
-            dates = np.random.choice(np.asarray(dates),size=100,replace=False)
-            for batch, date in tqdm(enumerate(dates), total=len(dates), position=0, leave=True):
+            # Move the hour loop here to process each hour
+            for hour in hours:
+                print(f'Hour = {hour}')
                 
-                logger.debug(f"hour={hour}, batch={batch}")
-                
-                try:
+                dgc = DataGenerator(data_config=data_config,
+                                    dates=[item.strftime('%Y%m%d') for item in dates],
+                                    batch_size=1,
+                                    shuffle=False,
+                                    hour=hour)
+                print('Fetching batches')
+                dates_subset = np.random.choice(np.asarray(dates), size=100, replace=False)
+                for batch, date in tqdm(enumerate(dates_subset), total=len(dates_subset), position=0, leave=True):
+                    logger.debug(f"hour={hour}, batch={batch}")
                     
-                    sample = dgc.__getitem__(batch)
-                    (depth, width, height) = sample[1]['output'].shape
+                    try:
+                        sample = dgc.__getitem__(batch)
+                        (depth, width, height) = sample[1]['output'].shape
                 
-                    for k in range(depth):
-                    
-                        observations = sample[1]['output'][k,...].flatten()
-                        forecast = sample[0]['lo_res_inputs'][k,...].flatten()
-                        const = sample[0]['hi_res_inputs'][k,...].flatten()
+                        for k in range(depth):
+                            observations = sample[1]['output'][k,...].flatten()
+                            forecast = sample[0]['lo_res_inputs'][k,...].flatten()
+                            const = sample[0]['hi_res_inputs'][k,...].flatten()
 
-                        # Check no Null values
-                        if np.isnan(observations).any() or np.isnan(forecast).any() or np.isnan(const).any():
-                            raise ValueError('Unexpected NaN values in data')
+                            # Check no Null values
+                            if np.isnan(observations).any() or np.isnan(forecast).any() or np.isnan(const).any():
+                                raise ValueError('Unexpected NaN values in data')
                         
-                        # Check for empty data
-                        if forecast.sum() == 0 or const.sum() == 0:
-                            raise ValueError('one or more of arrays is all zeros')
+                            # Check for empty data
+                            if forecast.sum() == 0 or const.sum() == 0:
+                                raise ValueError('one or more of arrays is all zeros')
                         
-                        # Check hi res data has same dimensions
-                            
-                        feature = {
-                            'generator_input': _float_feature(forecast),
-                            'constants': _float_feature(const),
-                            'generator_output': _float_feature(observations)
-                        }
+                            feature = {
+                                'generator_input': _float_feature(forecast),
+                                'constants': _float_feature(const),
+                                'generator_output': _float_feature(observations)
+                            }
 
-                        features = tf.train.Features(feature=feature)
-                        example = tf.train.Example(features=features)
-                        example_to_string = example.SerializeToString()
+                            features = tf.train.Features(feature=feature)
+                            example = tf.train.Example(features=features)
+                            example_to_string = example.SerializeToString()
                         
-                        # If provided, bin data according to bin boundaries (typically quartiles)
-                        if data_config.class_bin_boundaries is not None:
-                                                    
-                            threshold = 0.1
-                            if data_config.output_normalisation is not None:
-                                rainy_pixel_fraction = (denormalise(observations, normalisation_type=data_config.output_normalisation) > threshold).mean()
+                            # If provided, bin data according to bin boundaries
+                            if data_config.class_bin_boundaries is not None:
+                                threshold = 0.1
+                                if data_config.output_normalisation is not None:
+                                    rainy_pixel_fraction = (denormalise(observations, normalisation_type=data_config.output_normalisation) > threshold).mean()
+                                else:
+                                    rainy_pixel_fraction = (observations > threshold).mean()
+
+                                clss = np.digitize(rainy_pixel_fraction, bins=data_config.class_bin_boundaries, right=False)
                             else:
-                                rainy_pixel_fraction = (observations > threshold).mean()
-
-                            clss = np.digitize(rainy_pixel_fraction, right=False)
+                                clss = random.choice(range(data_config.num_classes))
                             
-                        else:
-                            clss = random.choice(range(data_config.num_classes))
-                            
-                        # Choose random shard
-                        fh = random.choice(fle_hdles[hour][clss])
-
-                        fh.write(example_to_string)
+                            # Choose random shard
+                            fh = random.choice(fle_hdles[hour][clss])
+                            fh.write(example_to_string)
                 
-                except FileNotFoundError as e:
-                    print(f"Error loading hour={hour}, date={date}")
+                    except FileNotFoundError as e:
+                        print(f"Error loading hour={hour}, date={date}")
                     
-                
         else:
             print('No dates found')
             
@@ -508,11 +656,7 @@ def write_data(year_month_ranges: list,
             for fh in fhs:
                 fh.close()
     
-                            
     return hash_dir
-
-
-
 
 # import os
 # import logging
