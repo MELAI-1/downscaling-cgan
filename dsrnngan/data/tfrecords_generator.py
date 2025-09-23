@@ -273,7 +273,7 @@ def create_dataset(data_label: str,
     else:
         int_seed = None
     
-    files_ds = tf.data.Dataset.list_files(f"{folder}/{data_label}_*.{clss}.*.tfrecords")
+    files_ds = tf.data.Dataset.list_files(f"{folder}/{data_label}_*.{clss}.*.tfrecords")  ##🚩chnange this to folder/year/ for the training
      
     ds = tf.data.TFRecordDataset(files_ds,
                                  num_parallel_reads=AUTOTUNE)
