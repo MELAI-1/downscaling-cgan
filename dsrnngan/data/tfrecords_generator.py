@@ -56,7 +56,7 @@ def create_mixed_dataset(data_label: str,
                          fcst_shape: tuple[int, int, int],
                          con_shape: tuple[int, int, int],
                          out_shape: tuple[int, int, int],
-                         repeat: bool=True,
+                         repeat: bool=False,
                          downsample: bool=False,
                          folder: str=records_folder,
                          shuffle_size: int=256,
@@ -242,7 +242,7 @@ def create_dataset(data_label: str,
                    out_shape=(200, 200, 1),
                    folder: str=records_folder,
                    shuffle_size: int=256,
-                   repeat: bool=True,
+                   repeat: bool=False,
                    crop_size: int=None,
                    rotate: bool=False,
                    seed: int=None):
@@ -278,7 +278,7 @@ def create_dataset(data_label: str,
     ds = tf.data.TFRecordDataset(files_ds,
                                  num_parallel_reads=AUTOTUNE)
     
-    ds = ds.shuffle(shuffle_size, seed=int_seed)
+    # ds = ds.shuffle(shuffle_size, seed=int_seed)
     
     ds = ds.map(lambda x: _parse_batch(x,
                                        insize=fcst_shape,

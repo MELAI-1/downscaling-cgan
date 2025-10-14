@@ -1,11 +1,11 @@
-name: cgan
+name: cgan_new
 channels:
   - conda-forge
 dependencies:
   - pip
-  - python=3.9
-  - cudnn=8.1.0
-  - cudatoolkit=11.2
+  # - python=3.
+  - cudnn
+  - cudatoolkit
   - matplotlib
   - pandas
   - jupyter
