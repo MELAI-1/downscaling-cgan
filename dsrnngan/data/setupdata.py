@@ -33,6 +33,10 @@ def setup_batch_gen(records_folder: str,
 
     tfrecords_generator.return_dic = False
     print(f"downsample flag is {downsample}")
+    
+    print(f"DEBUG:crop_size is {crop_size}(Type: {type(crop_size)})")
+    print(f"DEBUG:crop_size is {seed}(Type: {type(seed)})")
+    
     train = DataGenerator('train',
                            batch_size=batch_size,
                            fcst_shape=fcst_shape,
