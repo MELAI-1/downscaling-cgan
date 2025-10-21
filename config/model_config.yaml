@@ -36,9 +36,19 @@ train:
     batch_size: 2  #the batch size
 
 val:
-    val_range: ['201806', '201905'] # cannot pass a list if using create_fixed_dataset
-    val_size: 100
+   # val_range: ['201801', '201812'] 
+    val_range: ['201806', '201905']# cannot pass a list if using create_fixed_dataset
+    #val_size: 100
+    val_size: 8
     ensemble_size: 20
 
 
 #test
+
+#I add the eval part
+EVAL:
+    num_batches: 256 # number of full-image examples to evaluate on
+    add_postprocessing_noise: True  # flag for adding postprocessing noise in rank statistics eval
+    postprocessing_noise_factor: 1e-3  # factor for scaling postprocessing noise in rank statistics eval
+    max_pooling: True  # also calculate CRPS using max pooling over larger regions
+    avg_pooling: True  # ditto for average pooling
