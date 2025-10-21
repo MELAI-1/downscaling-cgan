@@ -196,7 +196,10 @@ max_latitude: 29
 latitude_step_size: 2.8
 min_longitude: 16
 max_longitude: 60
-
+input_image_shape: (384, 352, 11)
+constants_image_shape: (384, 352, 2)
+output_image_shape: (384, 352, 1)
+seed: 42
 
 
 longitude_step_size: 2.8
