@@ -189,7 +189,7 @@ normalise_inputs: True
 output_normalisation: "log"
 num_classes: 4
 
-downscaling_factor: 2
+downscaling_factor: 1
 
 min_latitude: -18.14
 max_latitude: 29
