@@ -154,20 +154,20 @@ def _dataset_cropper_dict(inputs, outputs, crop_size, seed=None):
     
     return cropped_inputs, cropped_outputs
 
-def _dataset_cropper_list(lores_inputs, hires_inputs, outputs, crop_size, seed=None):
+# def _dataset_cropper_list(lores_inputs, hires_inputs, outputs, crop_size, seed=None):
     
-    (_, _, lores_channels) = lores_inputs.shape
-    (_, _, hires_channels) = hires_inputs.shape
+#     (_, _, lores_channels) = lores_inputs.shape
+#     (_, _, hires_channels) = hires_inputs.shape
     
-    if not seed:
-        # Choose random seed (to make sure consistent selection)
-        seed = (np.random.randint(1e6), np.random.randint(1e6))
+#     if not seed:
+#         # Choose random seed (to make sure consistent selection)
+#         seed = (np.random.randint(1e6), np.random.randint(1e6))
     
-    cropped_output = tf.image.stateless_random_crop(outputs, size=[crop_size, crop_size, 1], seed=seed)
-    cropped_hires_input = tf.image.stateless_random_crop(hires_inputs, size=[crop_size, crop_size, hires_channels] , seed=seed)
-    cropped_lores_input = tf.image.stateless_random_crop(lores_inputs, size=[crop_size, crop_size, lores_channels], seed=seed)
+#     cropped_output = tf.image.stateless_random_crop(outputs, size=[crop_size, crop_size, 1], seed=seed)
+#     cropped_hires_input = tf.image.stateless_random_crop(hires_inputs, size=[crop_size, crop_size, hires_channels] , seed=seed)
+#     cropped_lores_input = tf.image.stateless_random_crop(lores_inputs, size=[crop_size, crop_size, lores_channels], seed=seed)
     
-    return cropped_lores_input, cropped_hires_input, cropped_output
+#     return cropped_lores_input, cropped_hires_input, cropped_output
 
 
 def _dataset_rotater_list(lores_inputs, hires_inputs, outputs, seed=None):
@@ -291,6 +291,7 @@ def create_dataset(data_label: str,
             ds = ds.map(lambda x,y: _dataset_cropper_dict(x, y, crop_size=crop_size, seed=seed), 
                                                           num_parallel_calls=AUTOTUNE)
         else:
+            crop_size=380
             ds = ds.map(lambda x,y,z: _dataset_cropper_list(x, y, z, crop_size=crop_size, seed=seed), 
                                                             num_parallel_calls=AUTOTUNE)
             
