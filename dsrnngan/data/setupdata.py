@@ -132,6 +132,7 @@ def setup_data(data_config: SimpleNamespace,
         if model_config.val.val_range is None:
             batch_gen_valid = None
         else:
+            print('Setting up validation full image dataset')
             batch_gen_valid = setup_full_image_dataset(data_config=data_config,
                                           year_month_ranges=model_config.val.val_range,
                                           batch_size=full_image_batch_size,
