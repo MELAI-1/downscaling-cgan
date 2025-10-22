@@ -264,7 +264,13 @@ def create_dataset(data_label: str,
     Returns:
         tf.data.DataSet: _description_
     """
-    
+    print(f'Creating dataset for class {clss} from folder {folder}')
+    print(f'Forecast shape: {fcst_shape}, Constant shape: {con_shape}, Output shape: {out_shape}'
+        )
+    print(f'Repeat: {repeat}, Crop size: {crop_size}, Rotate: {rotate}')
+    print("type crop size:", type(crop_size))
+    print(f'Seed: {seed}')
+    print("type of seed:", type(seed))
     if seed:
         if not isinstance(seed, int):
             int_seed = seed[0]
@@ -275,15 +281,11 @@ def create_dataset(data_label: str,
     
     files_ds = tf.data.Dataset.list_files(f"{folder}/{data_label}_*.{clss}.*.tfrecords")  ##🚩chnange this to folder/year/ for the training
      
-    ds = tf.data.TFRecordDataset(files_ds,
-                                 num_parallel_reads=AUTOTUNE)
+    ds = tf.data.TFRecordDataset(files_ds,num_parallel_reads=AUTOTUNE)
     
     # ds = ds.shuffle(shuffle_size, seed=int_seed)
     
-    ds = ds.map(lambda x: _parse_batch(x,
-                                       insize=fcst_shape,
-                                       consize=con_shape,
-                                       outsize=out_shape))
+    ds = ds.map(lambda x: _parse_batch(x,insize=fcst_shape,consize=con_shape,outsize=out_shape))
                 # num_parallel_calls=AUTOTUNE)
                 
     if crop_size:
@@ -291,7 +293,6 @@ def create_dataset(data_label: str,
             ds = ds.map(lambda x,y: _dataset_cropper_dict(x, y, crop_size=crop_size, seed=seed), 
                                                           num_parallel_calls=AUTOTUNE)
         else:
-            crop_size=380
             ds = ds.map(lambda x,y,z: _dataset_cropper_list(x, y, z, crop_size=crop_size, seed=seed), 
                                                             num_parallel_calls=AUTOTUNE)
             
