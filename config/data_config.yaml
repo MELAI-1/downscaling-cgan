@@ -325,5 +325,5 @@ paths:
       v_component_of_wind_850: []
 
     TFRecords:
-      tfrecords_path: '/home/melvin_aims_ac_za/data/tfrecords/final_tfrecord/'
+      tfrecords_path: '/home/melvin_aims_ac_za/data/tfrecords/final_tfrecord'
 
