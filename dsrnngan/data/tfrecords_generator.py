@@ -235,6 +235,81 @@ def _parse_batch(record_batch,
         return example['generator_input'], example['constants'], example['generator_output']
 
 
+# def create_dataset(data_label: str,
+#                    clss: str,
+#                    fcst_shape=(20, 20, 9),
+#                    con_shape=(200, 200, 2),
+#                    out_shape=(200, 200, 1),
+#                    folder: str=records_folder,
+#                    shuffle_size: int=256,
+#                    repeat: bool=False,
+#                    crop_size: int=None,
+#                    rotate: bool=False,
+#                    seed: int=None):
+#     """
+#     Load tfrecords and parse into appropriate shapes
+
+#     Args:
+#         year (int): year
+#         clss (str): class (bin to take data from)
+#         fcst_shape (tuple, optional): shape of the forecast data (lat, lon, n_features). Defaults to (20, 20, 9).
+#         con_shape (tuple, optional): shape of the constants data (lat, lon, n_features). Defaults to (200, 200, 2).
+#         out_shape (tuple, optional): shape of the output (lat, lon, n_features). Defaults to (200, 200, 1).
+#         folder (_type_, optional): folder containing tf records. Defaults to records_folder.
+#         shuffle_size (int, optional): buffer size for shuffling. Defaults to 1024.
+#         crop_size (int, optional): Size to crop randomly crop images to.
+#         rotate (bool, optional): whether to apply random rotations or not
+#         repeat (bool, optional): create repeat dataset or not. Defaults to True.
+
+#     Returns:
+#         tf.data.DataSet: _description_
+#     """
+#     print(f'Creating dataset for class {clss} from folder {folder}')
+#     print(f'Forecast shape: {fcst_shape}, Constant shape: {con_shape}, Output shape: {out_shape}'
+#         )
+#     print(f'Repeat: {repeat}, Crop size: {crop_size}, Rotate: {rotate}')
+#     print("type crop size:", type(crop_size))
+#     print(f'Seed: {seed}')
+#     print("type of seed:", type(seed))
+#     if seed:
+#         if not isinstance(seed, int):
+#             int_seed = seed[0]
+#         else:
+#             int_seed = seed
+#     else:
+#         int_seed = None
+    
+#     files_ds = tf.data.Dataset.list_files(f"{folder}/{data_label}_*.{clss}.*.tfrecords")  ##🚩chnange this to folder/year/ for the training
+     
+#     ds = tf.data.TFRecordDataset(files_ds,num_parallel_reads=AUTOTUNE)
+    
+#     # ds = ds.shuffle(shuffle_size, seed=int_seed)
+    
+#     ds = ds.map(lambda x: _parse_batch(x,insize=fcst_shape,consize=con_shape,outsize=out_shape))
+#                 # num_parallel_calls=AUTOTUNE)
+                
+#     if crop_size:
+#         if return_dic:
+#             ds = ds.map(lambda x,y: _dataset_cropper_dict(x, y, crop_size=crop_size, seed=seed), 
+#                                                           num_parallel_calls=AUTOTUNE)
+#         else:
+#             ds = ds.map(lambda x,y,z: _dataset_cropper_list(x, y, z, crop_size=crop_size, seed=seed), 
+#                                                             num_parallel_calls=AUTOTUNE)
+            
+#     if rotate:
+#         if return_dic:
+#             ds = ds.map(lambda x,y: _dataset_rotater_dict(x, y, seed=seed), 
+#                                                           num_parallel_calls=AUTOTUNE)
+#         else:
+#             ds = ds.map(lambda x,y,z: _dataset_rotater_list(x, y, z, seed=seed), 
+#                                                             num_parallel_calls=AUTOTUNE)
+            
+        
+#     if repeat:
+#         return ds.repeat()
+#     else:
+#         return ds
+
 def create_dataset(data_label: str,
                    clss: str,
                    fcst_shape=(20, 20, 9),
@@ -248,63 +323,86 @@ def create_dataset(data_label: str,
                    seed: int=None):
     """
     Load tfrecords and parse into appropriate shapes
-
-    Args:
-        year (int): year
-        clss (str): class (bin to take data from)
-        fcst_shape (tuple, optional): shape of the forecast data (lat, lon, n_features). Defaults to (20, 20, 9).
-        con_shape (tuple, optional): shape of the constants data (lat, lon, n_features). Defaults to (200, 200, 2).
-        out_shape (tuple, optional): shape of the output (lat, lon, n_features). Defaults to (200, 200, 1).
-        folder (_type_, optional): folder containing tf records. Defaults to records_folder.
-        shuffle_size (int, optional): buffer size for shuffling. Defaults to 1024.
-        crop_size (int, optional): Size to crop randomly crop images to.
-        rotate (bool, optional): whether to apply random rotations or not
-        repeat (bool, optional): create repeat dataset or not. Defaults to True.
-
-    Returns:
-        tf.data.DataSet: _description_
+    ... (docstring content) ...
     """
+    
+    # ----------------------------------------------------
+    # 🎯 START OF CORRECTION: Convert inputs to correct types
+    # ----------------------------------------------------
+    
+    # 1. Convert crop_size from string to int or None
+    if isinstance(crop_size, str):
+        if crop_size.lower() == 'none':
+            crop_size = None  # Convert 'None' string to Python None
+        else:
+            try:
+                crop_size = int(crop_size) # Convert string '42' to int 42
+            except ValueError:
+                # This should handle unexpected values
+                print(f"Warning: Invalid crop_size string '{crop_size}'. Setting to None.")
+                crop_size = None 
+
+    # 2. Convert seed from string to int or ensure it's None/int
+    if isinstance(seed, str):
+        if seed.lower() == 'none':
+            seed = None  # Convert 'None' string to Python None
+        else:
+            try:
+                seed = int(seed) # Convert string '42' to int 42
+            except ValueError:
+                print(f"Warning: Invalid seed string '{seed}'. Setting to None.")
+                seed = None
+    
+    # ----------------------------------------------------
+    # 🎯 END OF CORRECTION
+    # ----------------------------------------------------
+
     print(f'Creating dataset for class {clss} from folder {folder}')
     print(f'Forecast shape: {fcst_shape}, Constant shape: {con_shape}, Output shape: {out_shape}'
-        )
+         )
     print(f'Repeat: {repeat}, Crop size: {crop_size}, Rotate: {rotate}')
     print("type crop size:", type(crop_size))
     print(f'Seed: {seed}')
     print("type of seed:", type(seed))
+    
+    # The rest of the seed logic can be simplified now:
+    int_seed = None
     if seed:
         if not isinstance(seed, int):
-            int_seed = seed[0]
+            # This handles cases where seed might be a list/tuple of two ints 
+            # as required by stateless TF functions, taking the first element.
+            int_seed = seed[0] 
         else:
             int_seed = seed
-    else:
-        int_seed = None
     
-    files_ds = tf.data.Dataset.list_files(f"{folder}/{data_label}_*.{clss}.*.tfrecords")  ##🚩chnange this to folder/year/ for the training
-     
+    files_ds = tf.data.Dataset.list_files(f"{folder}/{data_label}_*.{clss}.*.tfrecords")
+
     ds = tf.data.TFRecordDataset(files_ds,num_parallel_reads=AUTOTUNE)
-    
+
     # ds = ds.shuffle(shuffle_size, seed=int_seed)
-    
+
     ds = ds.map(lambda x: _parse_batch(x,insize=fcst_shape,consize=con_shape,outsize=out_shape))
                 # num_parallel_calls=AUTOTUNE)
-                
-    if crop_size:
+
+    # Now, if crop_size was the string 'None', it's now the Python None,
+    # and the 'if crop_size:' check will correctly be skipped if no cropping is desired.
+    if crop_size: 
         if return_dic:
-            ds = ds.map(lambda x,y: _dataset_cropper_dict(x, y, crop_size=crop_size, seed=seed), 
-                                                          num_parallel_calls=AUTOTUNE)
-        else:
-            ds = ds.map(lambda x,y,z: _dataset_cropper_list(x, y, z, crop_size=crop_size, seed=seed), 
+            ds = ds.map(lambda x,y: _dataset_cropper_dict(x, y, crop_size=crop_size, seed=seed),
                                                             num_parallel_calls=AUTOTUNE)
-            
+        else:
+            ds = ds.map(lambda x,y,z: _dataset_cropper_list(x, y, z, crop_size=crop_size, seed=seed),
+                                                                num_parallel_calls=AUTOTUNE)
+
     if rotate:
         if return_dic:
-            ds = ds.map(lambda x,y: _dataset_rotater_dict(x, y, seed=seed), 
-                                                          num_parallel_calls=AUTOTUNE)
-        else:
-            ds = ds.map(lambda x,y,z: _dataset_rotater_list(x, y, z, seed=seed), 
+            ds = ds.map(lambda x,y: _dataset_rotater_dict(x, y, seed=seed),
                                                             num_parallel_calls=AUTOTUNE)
-            
-        
+        else:
+            ds = ds.map(lambda x,y,z: _dataset_rotater_list(x, y, z, seed=seed),
+                                                                num_parallel_calls=AUTOTUNE)
+
+
     if repeat:
         return ds.repeat()
     else:
