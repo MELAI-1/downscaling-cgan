@@ -33,6 +33,10 @@ def setup_batch_gen(records_folder: str,
 
     tfrecords_generator.return_dic = False
     print(f"downsample flag is {downsample}")
+    
+    print(f"DEBUG:crop_size is {crop_size}(Type: {type(crop_size)})")
+    print(f"DEBUG:crop_size is {seed}(Type: {type(seed)})")
+    
     train = DataGenerator('train',
                            batch_size=batch_size,
                            fcst_shape=fcst_shape,
@@ -58,7 +62,8 @@ def setup_batch_gen(records_folder: str,
     # else:
     #     val = tfrecords_generator.create_fixed_dataset(val_years, batch_size=batch_size, downsample=downsample,
     #                                                    folder=records_folder)
-    return train, None
+    # return train, None
+    return train
 
 
 def setup_full_image_dataset(
@@ -100,7 +105,7 @@ def setup_data(data_config: SimpleNamespace,
                shuffle: bool=True,
                full_image_batch_size: int=1) -> tuple[Generator]:
     """Setup data for training or validation
-
+th
     Args:
         data_config (SimpleNamespace): data config object
         model_config (SimpleNamespace): model config object
@@ -132,6 +137,7 @@ def setup_data(data_config: SimpleNamespace,
         if model_config.val.val_range is None:
             batch_gen_valid = None
         else:
+            print('Setting up validation full image dataset')
             batch_gen_valid = setup_full_image_dataset(data_config=data_config,
                                           year_month_ranges=model_config.val.val_range,
                                           batch_size=full_image_batch_size,
@@ -140,9 +146,10 @@ def setup_data(data_config: SimpleNamespace,
                                           shuffle=shuffle)
 
     else:
+        print('Setting up batch generators from TFRecords')
         if not records_folder:
             raise ValueError('No records folder given')
-        batch_gen_train, batch_gen_valid = setup_batch_gen(
+        batch_gen_train= setup_batch_gen(
             val=False,
             records_folder=records_folder,
             fcst_shape=fcst_shape,
@@ -154,6 +161,12 @@ def setup_data(data_config: SimpleNamespace,
             crop_size=model_config.train.crop_size,
             rotate=model_config.train.rotate,
             seed=seed)
+        batch_gen_valid = setup_full_image_dataset(data_config=data_config,
+                                          year_month_ranges=model_config.val.val_range,
+                                          batch_size=full_image_batch_size,
+                                          downsample=model_config.downsample,
+                                          hour=hour,
+                                          shuffle=shuffle)
 
     gc.collect()
     return batch_gen_train, batch_gen_valid

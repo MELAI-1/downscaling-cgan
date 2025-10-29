@@ -1,184 +1,3 @@
-# data_paths: "BLUE_PEBBLE"  # Choose which paths version to use in PATHS
-# fcst_data_source: "ngcm"
-# obs_data_source: "imerg"
-# # normalisation_year: 2017
-# normalisation_year: 2018
-# num_samples: 320000
-# normalise_inputs: True
-# output_normalisation: "log"
-# num_classes: 4 # Number of bins to split data into
-
-# ##🚩 I start with different value of dowscaling factor 
-# downscaling_factor: 2
-# ##🚩 The right value of dowsclaing of ngcm but due to resources constraint  I need to start with this small one=4
-# # downscaling_factor: 28
-# # dowscaling_steps:[2,2,7] 
-
-# ##🚩 I change the coordinates of latitude and longitude
-# # min_latitude: -11.95  
-# # max_latitude: 15.05
-# # latitude_step_size: 0.1
-# # min_longitude: 25.05
-# # max_longitude: 51.45
-# # longitude_step_size: 0.1 ##🚩 The longitude step size is set to 2.8 for the NGCM data
-# min_latitude: -20 
-# max_latitude: 30
-# latitude_step_size: 2.8
-# min_longitude: 15
-# max_longitude: 60
-# longitude_step_size: 2.8
-
-# ##🚩 we need to change the input fields 
-# # input_fields: 
-# #     - 2t
-# #     - cape
-# #     - cp
-# #     - r200
-# #     - r700
-# #     - r950
-# #     - sp
-# #     - t200
-# #     - t700
-# #     - tclw
-# #     - tcwv
-# #     - tisr
-# #     - tp
-# #     - u200
-# #     - u700
-# #     - v200
-# #     - v700
-# #     - w200
-# #     - w500
-# #     - w700
-# input_fields: 
-#     - evaporation
-#     - precipitation_cumulative_mean
-#     - specific_cloud_ice_water_content_500
-#     - specific_cloud_ice_water_content_700
-#     - specific_cloud_ice_water_content_850
-#     - u_component_of_wind_500
-#     - u_component_of_wind_700
-#     - u_component_of_wind_850
-#     - v_component_of_wind_500
-#     - v_component_of_wind_700
-#     - v_component_of_wind_850
-# constant_fields:
-#     - orography
-#     - lsm
-# input_normalisation_strategy:
-#     tpq:
-#       negative_vals: False
-#       normalisation: "log"
-#     tp:
-#       negative_vals: False
-#       normalisation: "log"
-#     cp: 
-#       negative_vals: False
-#       normalisation: "log"
-#     pr:
-#       negative_vals: False
-#       normalisation: "log"
-#     prl:
-#       negative_vals: False
-#       normalisation: "log"
-#     prc:
-#       negative_vals: False
-#       normalisation: "log"
-#     sp:
-#       normalisation: "minmax"
-#     u: 
-#       normalisation: "max"
-#     v:
-#       normalisation: "max"
-#     w: 
-#       normalisation: "max"
-#     r:
-#       normalisation: "max"
-#     2t:
-#       normalisation: "minmax"
-#       negative_vals: False
-#     cape: 
-#       normalisation: "log"
-#     cin:
-#       normalisation: "max" 
-#     t:
-#       normalisation: "minmax"
-#       negative_vals: False
-#     tclw:
-#       normalisation: "log" 
-#     tcwv:
-#       normalisation: "max"
-#     tisr:
-#       normalisation: "max"
-
-# ##🚩 NGCM input normalisation strategy
-
-# ngcm_input_normalisation_strategy:
-#     evaporation:
-#       normalisation: "log"
-#     precipitation_cumulative_mean:  
-#       negative_vals: False
-#       normalisation: "log"
-#     specific_cloud_ice_water_content:
-#       negative_vals: False
-#       normalisation: "log"
-#     u_component_of_wind:
-#       normalisation: "minmax"
-#     v_component_of_wind:
-#       normalisation: "minmax"
-# paths:
-#   BLUE_PEBBLE:
-#       GENERAL:
-#           IMERG: '/home/melvin_aims_ac_za/data/IMERG' ##🚩IMERG data path need  also to be change and i need also to make sure that the 
-#           ERA5: '/bp1/geog-tropical/data/ERA-5/day'
-#           IFS: '/bp1/geog-tropical/users/uz22147/east_africa_data/IFS'
-#           OROGRAPHY: '/home/melvin_aims_ac_za/data/constants/h_HRES_EAfrica.nc'
-#           LSM: '/home/melvin_aims_ac_za/data/constants/lsm_HRES_EAfrica.nc'
-#           LAKES: '/bp1/geog-tropical/users/uz22147/east_africa_data/constants/lake_mask.nc'
-#           SEA: '/bp1/geog-tropical/users/uz22147/east_africa_data/constants/sea_mask.nc'
-#           CONSTANTS: '/home/melvin_aims_ac_za/data/constants/'
-#           NGCM: '/home/melvin_aims_ac_za/data/NGCM/' ##🚩
-#           STATS: '/home/melvin_aims_ac_za/data/constants/neuralgcm_Horn_Africa_2018_stats.pkl' ##🚩 I add this path for the statistics 
-          
-#       NGCM:
-#           evaporation: []
-#           precipitation_cumulative_mean: []
-#           specific_cloud_ice_water_content_500: []
-#           specific_cloud_ice_water_content_700: []
-#           specific_cloud_ice_water_content_850: []
-#           u_component_of_wind_500: []
-#           u_component_of_wind_700: []
-#           u_component_of_wind_850: []
-#           v_component_of_wind_500: []
-#           v_component_of_wind_700: []
-#           v_component_of_wind_850: []
-#       TFRecords:
-#           # tfrecords_path: '/user/work/uz22147/tfrecords/'
-#           tfrecords_path: '/home/melvin_aims_ac_za/data/tfrecords' ##🚩 need to change the tfrecord path
-
-
-
-          # Pour spécifier un chemin d'accès dans un bucket (par exemple sur un stockage cloud comme Google Cloud Storage ou Azure Blob Storage),
-          # il faut utiliser le format spécifique du fournisseur. Voici quelques exemples :
-
-          # Exemple pour Google Cloud Storage :
-          # gs://nom-du-bucket/chemin/vers/le/fichier
-
-          # Exemple pour Azure Blob Storage :
-          # https://nomducompte.blob.core.windows.net/nom-du-container/chemin/vers/le/fichier
-
-          # # Exemple d'ajout dans la configuration :
-          # bucket_paths:
-          #   GCS_EXEMPLE: 'gs://melvin_aims_bucket/mon-dossier/mon-fichier.nc'
-          #   AZURE_EXEMPLE: 'https://moncompte.blob.core.windows.net/moncontainer/monfichier.nc'
-
-
-    
-
-    #execution code 
-
-
-# python -m dsrnngan.data.tfrecords_generator   --records-folder '/home/melvin_aims_ac_za/data/tfrecords' --fcst-hours  0 6 12 18 --data-config-path '/home/melvin_aims_ac_za/downscaling-cgan/config/data_config.yaml' --model-config-path '/home/melvin_aims_ac_za/downscaling-cgan/config/model_config.yaml'
 
 data_paths: "BLUE_PEBBLE"  # Choose which paths version to use in PATHS
 fcst_data_source: "ngcm"
@@ -188,9 +7,6 @@ num_samples: 320000
 normalise_inputs: True
 output_normalisation: "log"
 num_classes: 4
-
-downscaling_factor: 1
-
 min_latitude: -18.14
 max_latitude: 29
 latitude_step_size: 2.8
@@ -200,9 +16,13 @@ input_image_shape: (384, 352, 11)
 constants_image_shape: (384, 352, 2)
 output_image_shape: (384, 352, 1)
 seed: 42
+input_channels: 11
 
 
-longitude_step_size: 2.8
+
+downscaling_factor: 1
+longitude_step_size: 0.1
+latitude_step_size: 0.1
 
 input_fields: 
     - evaporation

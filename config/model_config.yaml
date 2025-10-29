@@ -10,7 +10,9 @@ log_folder: "/home/melvin_aims_ac_za/logs"
 downscaling_factor: 1  # increase in image size in each dimension
 downscaling_steps: [1]  # list of integers that multiply to the downscaling factor; the generator will use UpSampling2D layers of these sizes, alternating with residual blocks.
 
+
 generator:
+    # filters_gen: 64
     filters_gen: 128
     noise_channels: 4 # used for GAN
     latent_variables: 1 # used for VAEGAN
@@ -21,8 +23,8 @@ discriminator:
     learning_rate_disc: 1e-5
 
 train:
-    # training_range: ['201603', '201802'] # Start and end of training period, in YYYYMM format 
-    training_range: ['201801', '201802'] # Start and end of training period, in YYYYMM 
+    training_range: ['201603', '201802'] # Start and end of training period, in YYYYMM format 
+    # training_range: ['201801', '201802'] # Start and end of training period, in YYYYMM 
 
     training_weights: [0.25, 0.25, 0.25, 0.25]
     num_epochs: 5
