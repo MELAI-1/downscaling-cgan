@@ -228,7 +228,7 @@ def make_dataset_consistent(ds: xr.Dataset):
     return ds
 
 def get_obs_dates(date_range: list,  hour: int, obs_data_source: str, 
-                  data_paths=DATA_PATHS,
+                  dataall_ngcmths=DATA_PATHS,
                   ):
     """
     Get dates for which there is observational data available
