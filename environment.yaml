@@ -3,9 +3,9 @@ channels:
   - conda-forge
 dependencies:
   - pip
-  # - python=3.
-  - cudnn
-  - cudatoolkit
+  - python=3.9
+  - cudnn=8.1.0
+  - cudatoolkit=11.2
   - matplotlib
   - pandas
   - jupyter
@@ -33,7 +33,7 @@ dependencies:
   - wandb
   - timezonefinder
   - metpy
-  - gitpython  # Duplicated entry
+  - gitpython
   - jupytext
-  # pip:
-  #   - tensorflow-gpu=2.8.2
+  pip:
+    - tensorflow-gpu=2.8.2
