@@ -1,11 +1,11 @@
-name: cgan_stable
+name: cgan
 channels:
   - conda-forge
-  - defaults
 dependencies:
-  - python=3.10
-  - cudnn=8.9.7
-  - cudatoolkit=11.8
+  - pip
+  - python=3.9
+  - cudnn=8.1.0
+  - cudatoolkit=11.2
   - matplotlib
   - pandas
   - jupyter
@@ -22,17 +22,18 @@ dependencies:
   - climlab
   - iris
   - scikit-learn
-  - keras
+  - keras-preprocessing
   - black
   - pytest
-  - numpy<2.0
-  - esmf=8.6.0
-  - esmpy=8.6.0
+  - numpy
+  - esmf=8.4.1
+  - esmpy=8.4.1
   - xesmf
   - gitpython
   - wandb
   - timezonefinder
   - metpy
+  - gitpython
   - jupytext
   pip:
-    - tensorflow[and-cuda]==2.15.0
+    - tensorflow-gpu=2.8.2
