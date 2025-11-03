@@ -19,6 +19,25 @@ def train_model(*,
                 plot_fn=None,
                 log_folder=None,
                 training_ratio=5):
+    
+    
+    # Prendre un batch pour tests
+    batch = next(iter(batch_gen_train.take(1).as_numpy_iterator()))
+
+    # Vérifier la structure du batch (par exemple 3 éléments attendus)
+    assert len(batch) == 3, f"Batch inattendu avec {len(batch)} éléments"
+
+    cond = batch[0]
+
+    # Vérifier que cond est bien un array ou tensor numpy
+    assert hasattr(cond, 'shape'), "cond n'a pas de forme reconnue"
+
+    # Vérifier que le batch a au moins un élément
+    assert cond.shape[0] > 0, "Batch vide détecté"
+
+    # Afficher les shapes pour confirmation
+    print("Shape complète du batch cond :", cond.shape)
+
 
     for cond, _, _ in batch_gen_train.take(1).as_numpy_iterator():
         img_shape = cond.shape[1:-1]
