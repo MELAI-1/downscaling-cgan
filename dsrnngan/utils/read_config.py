@@ -100,10 +100,16 @@ def read_data_config(config_filename: str='data_config.yaml', config_folder: str
     else:
         data_config_ns.output_normalisation = data_config_dict.get('output_normalisation', "log")
         
-    # Infer input image dimensions if not given
-    latitude_range, longitude_range = get_lat_lon_range_from_config(data_config=data_config_ns)
-    data_config_ns.input_image_height = len(latitude_range)
-    data_config_ns.input_image_width = len(longitude_range)
+    # # Infer input image dimensions if not given
+    # latitude_range, longitude_range = get_lat_lon_range_from_config(data_config=data_config_ns)
+    # data_config_ns.input_image_height = len(latitude_range)
+    # data_config_ns.input_image_width = len(longitude_range)
+    data_config_ns.input_image_height = 384
+    data_config_ns.input_image_width  = 352
+    # data_config_ns.input_image_channels = 11
+    # data_config_ns.constants_image_channels = 2
+    # data_config_ns.output_image_channels = 1
+
 
     return data_config_ns
 
