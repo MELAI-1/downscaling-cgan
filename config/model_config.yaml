@@ -28,7 +28,7 @@ train:
 
     training_weights: [0.25, 0.25, 0.25, 0.25]
     num_epochs: 5
-    steps_per_checkpoint: 3200
+    steps_per_checkpoint: 32
     batch_size: 1  # can use 400x16 without CL, or 3200x2 with CL
     kl_weight: 1e-8  # used for VAEGAN
     ensemble_size: 8  # size of pred ensemble for content loss
