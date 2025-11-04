@@ -35,7 +35,7 @@ train:
     CL_type: "ensmeanMSE" # type of content loss to use: 'CRPS', 'CRPS_phys', 'ensmeanMSE', 'ensmeanMSE_phys' # we can change it after for the evaluation part
     content_loss_weight: 1000.0
     img_chunk_width: None
-    batch_size: 2  #the batch size
+    batch_size: 1  #the batch size
 
 val:
    # val_range: ['201801', '201812'] 
