@@ -28,24 +28,24 @@ train:
 
     training_weights: [0.25, 0.25, 0.25, 0.25]
     num_epochs: 6
-    steps_per_checkpoint: 3
+    steps_per_checkpoint: 3200
     batch_size: 2  # can use 400x16 without CL, or 3200x2 with CL
     kl_weight: 1e-8  # used for VAEGAN
     ensemble_size: 8  # size of pred ensemble for content loss
     CL_type: "ensmeanMSE" # type of content loss to use: 'CRPS', 'CRPS_phys', 'ensmeanMSE', 'ensmeanMSE_phys' # we can change it after for the evaluation part
     content_loss_weight: 1000.0
     # img_chunk_width: None
-    img_chunk_width: 200
+    img_chunk_width: 256
     num_samples: 6
     
-    # batch_size: 1  #the batch size
 
 val:
-   # val_range: ['201801', '201812'] 
-    val_range: ['201806', '201905']# cannot pass a list if using create_fixed_dataset
-    #val_size: 100
+    val_range: ['201801', '201812'] 
+    # val_range: ['201806', '201905'] # cannot pass a list if using create_fixed_dataset
+    # val_size: 100
     val_size: 8
-    ensemble_size: 20
+    # ensemble_size: 20
+    ensemble_size: 5
 
 
 #test
