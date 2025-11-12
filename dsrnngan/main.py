@@ -240,7 +240,8 @@ def main(restart: bool,
                 mode = 'online'
                 # Initiialise weights and biases logging
             wandb.init(
-                project='cgan-test' if args.debug else 'cgan-east-africa',
+                entity=model_config.wandb.entity,
+                project=model_config.wandb.debug_project_name if args.debug else model_config.wandb.project_name,
                 sync_tensorboard=True,
                 name=log_folder.split('/')[-1],
                 config={

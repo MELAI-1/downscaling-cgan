@@ -464,7 +464,9 @@ def plot_sequences(gen,
     plt.suptitle('Checkpoint ' + str(checkpoint))
 
     if out_fn is not None:
-        plt.savefig(out_fn, bbox_inches='tight')
+        # plt.savefig(out_fn, bbox_inches='tight')
+        # plt.savefig(out_fn + f'-ckpt{checkpoint}.pdf', bbox_inches='tight')
+        plt.savefig(out_fn+f"_{checkpoint}.pdf", bbox_inches='tight')
         plt.close()
 
 
