@@ -60,6 +60,6 @@ EVAL:
 
 #use for wandb logging 
 wandb:
-    entity: "melvinfokam"  # the entity (team) name for Weights & Biases logging
+    entity: "paderborn-university"  # the entity (team) name for Weights & Biases logging
     project_name: "neuralgcm-cgan-east-africa"
     debug_project_name: "neuralgcm-cgan-test"
