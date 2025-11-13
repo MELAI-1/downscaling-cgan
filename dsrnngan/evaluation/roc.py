@@ -8,7 +8,7 @@ from sklearn.metrics import auc, precision_recall_curve, roc_curve
 import dsrnngan.data.data as data
 import dsrnngan.model.setupmodel as setupmodel
 from dsrnngan.evaluation.benchmarks import nn_interp_model
-from dsrnngan.data.data import all_fcst_fields, get_dates
+from dsrnngan.data.data import all_ngcm_fields, get_dates
 from dsrnngan.data.data_generator import DataGenerator as DataGeneratorFull
 from dsrnngan.evaluation.evaluation import _init_VAEGAN
 from dsrnngan.model.noise import NoiseGenerator
@@ -69,7 +69,7 @@ def calculate_roc(*,
     if predict_full_image:
         dates = get_dates(predict_year)
         data_predict = DataGeneratorFull(dates=dates,
-                                         fcst_fields=all_fcst_fields,
+                                         fcst_fields=all_ngcm_fields,
                                          batch_size=batch_size,
                                          normalise_inputs=True,
                                          shuffle=True,
@@ -87,13 +87,13 @@ def calculate_roc(*,
             raise RuntimeError('Data generator for benchmarks not implemented for small images')
         # requires a different data generator with different fields and no fcst_norm
         data_benchmarks = DataGeneratorFull(dates=dates,
-                                            fcst_fields=all_fcst_fields,
+                                            fcst_fields=all_ngcm_fields,
                                             batch_size=batch_size,
                                             normalise_inputs=False,
                                             shuffle=True,
                                             constant_fields=True,
                                             hour="random")
-        tpidx = all_fcst_fields.index('tp')
+        tpidx = all_ngcm_fields.index('precipitation_cumulative_mean')
 
     auc_scores_roc = {}  # will only contain GAN AUCs; used for "progress vs time" plot
     auc_scores_pr = {}
