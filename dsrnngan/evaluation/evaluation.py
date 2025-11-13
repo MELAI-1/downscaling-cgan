@@ -120,8 +120,8 @@ def create_single_sample(*,
                    seed: int=None
                    ):
     
-    if 'tp' in data_config.input_fields:
-        tpidx = data_config.input_fields.index('tp')
+    if 'precipitation_cumulative_mean' in data_config.input_fields:
+        tpidx = data_config.input_fields.index('precipitation_cumulative_mean')
     else:
         # Temporary fix to allow testing of other tp variants
         tpidx = data_config.input_fields.index('tpq')
@@ -206,7 +206,7 @@ def eval_one_chkpt(*,
     output_normalisation = data_config.output_normalisation
     
     if data_config.normalise_inputs:
-        input_normalisation = data_config.input_normalisation_strategy['tp']['normalisation']
+        input_normalisation = data_config.ngcm_input_normalisation_strategy['precipitation_cumulative_mean']['normalisation']
     else:
         input_normalisation = None
         
@@ -240,8 +240,8 @@ def eval_one_chkpt(*,
     fcst_mae_all = []
     max_quantile_diff = []
 
-    if 'tp' in data_config.input_fields:
-        tpidx = data_config.input_fields.index('tp')
+    if 'precipitation_cumulative_mean' in data_config.input_fields:
+        tpidx = data_config.input_fields.index('precipitation_cumulative_mean')
     else:
         # Temporary fix to allow testing of other tp variants
         tpidx = data_config.input_fields.index('tpq')
