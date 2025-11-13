@@ -132,17 +132,17 @@ paths:
       STATS: '/home/melvin_aims_ac_za/data/constants/neuralgcm_Horn_Africa_2018_stats.pkl'
 
     NGCM:
-      evaporation: []
-      precipitation_cumulative_mean: []
-      specific_cloud_ice_water_content_500: []
-      specific_cloud_ice_water_content_700: []
-      specific_cloud_ice_water_content_850: []
-      u_component_of_wind_500: []
-      u_component_of_wind_700: []
-      u_component_of_wind_850: []
-      v_component_of_wind_500: []
-      v_component_of_wind_700: []
-      v_component_of_wind_850: []
+      evaporation: '/home/melvin_aims_ac_za/data/
+      precipitation_cumulative_mean: '/home/melvin_aims_ac_za/data/'
+      specific_cloud_ice_water_content_500: '/home/melvin_aims_ac_za/data/'
+      specific_cloud_ice_water_content_700: '/home/melvin_aims_ac_za/data/'
+      specific_cloud_ice_water_content_850: '/home/melvin_aims_ac_za/data/'
+      u_component_of_wind_500: '/home/melvin_aims_ac_za/data/'
+      u_component_of_wind_700: '/home/melvin_aims_ac_za/data/'
+      u_component_of_wind_850: '/home/melvin_aims_ac_za/data/'
+      v_component_of_wind_500: '/home/melvin_aims_ac_za/data/'
+      v_component_of_wind_700: '/home/melvin_aims_ac_za/data/'
+      v_component_of_wind_850: '/home/melvin_aims_ac_za/data/'
 
     TFRecords:
       tfrecords_path: '/home/melvin_aims_ac_za/data/tfrecords/final_tfrecord'
