@@ -16,7 +16,6 @@ from dsrnngan.utils.read_config import get_data_paths
 
 logger = logging.getLogger(__file__)
 logger.setLevel(logging.DEBUG)
-AUTOTUNE = tf.data.AUTOTUNE
 return_dic = True
 
 DATA_PATHS = read_config.get_data_paths()
@@ -322,7 +321,7 @@ def create_dataset(
     fcst_shape=(20, 20, 9),
     con_shape=(200, 200, 2),
     out_shape=(200, 200, 1),
-    folder=None,
+    folder: str=records_folder,
     shuffle_size: int = 256,
     repeat: bool = False,
     crop_size: int = None,
@@ -364,18 +363,20 @@ def create_dataset(
     folder_list = [folder] if isinstance(folder, str) else list(folder)
 
     # Gather all TFRecord files matching the years
-    all_files = []
-    for fdir in folder_list:
-        if years is None:
-            pattern = f"{data_label}_*.{clss}.*.tfrecords"
-            all_files.extend(glob.glob(os.path.join(fdir, pattern)))
-        else:
-            for yr in years:
-                pattern = f"{data_label}_{yr}_*.{clss}.*.tfrecords"
-                all_files.extend(glob.glob(os.path.join(fdir, pattern)))
-
+   all_files = []
+   for fdir in folder_list:
+     if years is None:
+       # Tous les fichiers train_*.tfrecords dans tous les sous-dossiers
+       pattern = os.path.join(fdir, "**", f"{data_label}_*.tfrecords")
+       all_files.extend(glob.glob(pattern, recursive=True))
+       else:
+         for yr in years:
+           # Cherche dans le sous-dossier de l'année seulement
+           pattern = os.path.join(fdir, str(yr), f"{data_label}_*.tfrecords")
+           all_files.extend(glob.glob(pattern))
+           
     if not all_files:
-        raise FileNotFoundError(f"No TFRecords found in {folder_list} for years {years}")
+      raise FileNotFoundError(f"No TFRecords found in {folder_list} for years {years}")
 
     files_ds = tf.data.Dataset.from_tensor_slices(all_files)
     files_ds = files_ds.shuffle(len(all_files), seed=int_seed)
