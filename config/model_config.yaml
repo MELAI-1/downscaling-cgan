@@ -13,7 +13,6 @@ downscaling_steps: [1]  # list of integers that multiply to the downscaling fact
 
 generator:
     filters_gen: 64
-    # filters_gen: 128
     noise_channels: 4 # used for GAN
     latent_variables: 1 # used for VAEGAN
     learning_rate_gen: 1e-5
@@ -23,36 +22,33 @@ discriminator:
     learning_rate_disc: 1e-5
 
 train:
-    # training_range: ['201603', '201802'] # Start and end of training period, in YYYYMM format 
-    training_range: ['201801', '201812'] # Start and end of training period, in YYYYMM 
+    training_range: ['200101', '201501'] # Start and end of training period, in YYYYMM 
 
     training_weights: [0.25, 0.25, 0.25, 0.25]
-    num_epochs: 2
-    steps_per_checkpoint: 1000
+    num_epochs: 5
+    steps_per_checkpoint: 10000
     batch_size: 2  # can use 400x16 without CL, or 3200x2 with CL
     kl_weight: 1e-8  # used for VAEGAN
-    ensemble_size: 4  # size of pred ensemble for content loss
+    ensemble_size: 8  # size of pred ensemble for content loss
     CL_type: "ensmeanMSE" # type of content loss to use: 'CRPS', 'CRPS_phys', 'ensmeanMSE', 'ensmeanMSE_phys' # we can change it after for the evaluation part
     content_loss_weight: 1000.0
     # img_chunk_width: None
-    img_chunk_width: 128
-    num_samples: 2
+    img_chunk_width: 256
+    num_samples: 320000
     
 
 val:
-    val_range: ['201801', '201812'] 
-    # val_range: ['201806', '201905'] # cannot pass a list if using create_fixed_dataset
-    # val_size: 100
-    val_size: 4
-    # ensemble_size: 20
-    ensemble_size: 4
+    val_range: ['201502', '202012'] 
+    val_size: 100
+    ensemble_size: 20
+
 
 
 #test
 
 #I add the eval part
 EVAL:
-    num_batches: 20 # number of full-image examples to evaluate on
+    num_batches: 256 # number of full-image examples to evaluate on
     add_postprocessing_noise: True  # flag for adding postprocessing noise in rank statistics eval
     postprocessing_noise_factor: 1e-3  # factor for scaling postprocessing noise in rank statistics eval
     max_pooling: True  # also calculate CRPS using max pooling over larger regions

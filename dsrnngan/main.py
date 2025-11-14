@@ -230,7 +230,8 @@ def main(restart: bool,
             log_file = os.path.join(log_folder, "log.txt")
             log_list = []
 
-        plot_fname = os.path.join(log_folder, "progress.pdf")
+        # plot_fname = os.path.join(log_folder, "progress.pdf")
+        plot_fname = os.path.join(log_folder, f"progress") 
 
         while (training_samples < model_config.train.num_samples):  # main training loop
 
