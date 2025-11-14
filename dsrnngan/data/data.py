@@ -868,6 +868,34 @@ def get_ngcm_forecast_time(year: int,
         raise ValueError("Not acceptable time")
         
     return loaddate, loadtime
+
+
+def get_imerg_forecast_time(year: int, 
+                          month: int, 
+                          day:int, hour: int):
+    
+    
+    
+    """    Get the closest IMERG forecast load (between 0-23h lead time) to the target  """
+    
+    time = datetime(year=year, month=month, day=day, hour=hour)
+    
+    if time.hour < 6:
+        loaddate = time  #  - timedelta(days=1)
+        loadtime = 0
+    elif 6 <= time.hour < 12:
+        loaddate = time
+        loadtime = 6
+    elif 12 <= time.hour < 18:
+        loaddate = time
+        loadtime = 12
+    elif 18 <= time.hour < 24:
+        loaddate = time
+        loadtime = 18
+    else:
+        raise ValueError("Not acceptable time")
+        
+    return loaddate, loadtime
     
 def load_ifs_raw(field: str, 
                  year: int, 
@@ -1619,7 +1647,10 @@ def load_imerg_raw(year: int, month: int, day: int,
         latitude_vals = latitude_vals.astype(np.float32)
         longitude_vals = longitude_vals.astype(np.float32)
     
-    fps = get_imerg_filepaths(year, month, day, hour, imerg_data_dir=imerg_data_dir, file_ending=file_ending)
+    
+    loaddate, loadtime = get_imerg_forecast_time(year, month, day, hour)
+    
+    fps = get_imerg_filepaths(loaddate.year, loaddate.month, loaddate.day, loadtime, imerg_data_dir=imerg_data_dir, file_ending=file_ending)
     
     datasets = []
     
