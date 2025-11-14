@@ -1,4 +1,3 @@
-
 data_paths: "BLUE_PEBBLE"  # Choose which paths version to use in PATHS
 fcst_data_source: "ngcm"
 obs_data_source: "imerg"
@@ -9,113 +8,111 @@ output_normalisation: "log"
 num_classes: 4
 min_latitude: -18.14
 max_latitude: 29
-latitude_step_size: 2.8
 min_longitude: 16
 max_longitude: 60
+
 input_image_shape: (384, 352, 11)
 constants_image_shape: (384, 352, 2)
 output_image_shape: (384, 352, 1)
+
 seed: 42
 input_channels: 11
 
-
-
+# Downscaling configuration
 downscaling_factor: 1
 longitude_step_size: 0.1
 latitude_step_size: 0.1
 
 input_fields: 
-    - evaporation
-    - precipitation_cumulative_mean
-    - specific_cloud_ice_water_content_500
-    - specific_cloud_ice_water_content_700
-    - specific_cloud_ice_water_content_850
-    - u_component_of_wind_500
-    - u_component_of_wind_700
-    - u_component_of_wind_850
-    - v_component_of_wind_500
-    - v_component_of_wind_700
-    - v_component_of_wind_850
+  - evaporation
+  - precipitation_cumulative_mean
+  - specific_cloud_ice_water_content_500
+  - specific_cloud_ice_water_content_700
+  - specific_cloud_ice_water_content_850
+  - u_component_of_wind_500
+  - u_component_of_wind_700
+  - u_component_of_wind_850
+  - v_component_of_wind_500
+  - v_component_of_wind_700
+  - v_component_of_wind_850
 
 constant_fields:
-    - orography
-    - lsm
+  - orography
+  - lsm
 
 input_normalisation_strategy:
-    tpq:
-      negative_vals: False
-      normalisation: "log"
-    tp:
-      negative_vals: False
-      normalisation: "log"
-    cp: 
-      negative_vals: False
-      normalisation: "log"
-    pr:
-      negative_vals: False
-      normalisation: "log"
-    prl:
-      negative_vals: False
-      normalisation: "log"
-    prc:
-      negative_vals: False
-      normalisation: "log"
-    sp:
-      normalisation: "minmax"
-    u: 
-      normalisation: "max"
-    v:
-      normalisation: "max"
-    w: 
-      normalisation: "max"
-    r:
-      normalisation: "max"
-    2t:
-      normalisation: "minmax"
-      negative_vals: False
-    cape: 
-      normalisation: "log"
-    cin:
-      normalisation: "max" 
-    t:
-      normalisation: "minmax"
-      negative_vals: False
-    tclw:
-      normalisation: "log" 
-    tcwv:
-      normalisation: "max"
-    tisr:
-      normalisation: "max"
+  tpq:
+    negative_vals: False
+    normalisation: "log"
+  tp:
+    negative_vals: False
+    normalisation: "log"
+  cp: 
+    negative_vals: False
+    normalisation: "log"
+  pr:
+    negative_vals: False
+    normalisation: "log"
+  prl:
+    negative_vals: False
+    normalisation: "log"
+  prc:
+    negative_vals: False
+    normalisation: "log"
+  sp:
+    normalisation: "minmax"
+  u: 
+    normalisation: "max"
+  v:
+    normalisation: "max"
+  w: 
+    normalisation: "max"
+  r:
+    normalisation: "max"
+  2t:
+    normalisation: "minmax"
+    negative_vals: False
+  cape: 
+    normalisation: "log"
+  cin:
+    normalisation: "max" 
+  t:
+    normalisation: "minmax"
+    negative_vals: False
+  tclw:
+    normalisation: "log" 
+  tcwv:
+    normalisation: "max"
+  tisr:
+    normalisation: "max"
 
 ngcm_input_normalisation_strategy:
-    evaporation:
-      normalisation: "log"
-    precipitation_cumulative_mean:  
-      negative_vals: False
-      normalisation: "log"
-    specific_cloud_ice_water_content_500:
-      negative_vals: False
-      normalisation: "log"
-    specific_cloud_ice_water_content_700:
-      negative_vals: False
-      normalisation: "log"
-    specific_cloud_ice_water_content_850:
-      negative_vals: False
-      normalisation: "log"
-
-    u_component_of_wind_500:
-      normalisation: "minmax"
-    u_component_of_wind_700:
-      normalisation: "minmax"
-    u_component_of_wind_850:
-      normalisation: "minmax"
-
-    v_component_of_wind_500:
-      normalisation: "minmax"
-    v_component_of_wind_700:
-      normalisation: "minmax"
-    v_component_of_wind_850:
-      normalisation: "minmax"
+  evaporation:
+    normalisation: "log"
+  precipitation_cumulative_mean:  
+    negative_vals: False
+    normalisation: "log"
+  specific_cloud_ice_water_content_500:
+    negative_vals: False
+    normalisation: "log"
+  specific_cloud_ice_water_content_700:
+    negative_vals: False
+    normalisation: "log"
+  specific_cloud_ice_water_content_850:
+    negative_vals: False
+    normalisation: "log"
+  u_component_of_wind_500:
+    normalisation: "minmax"
+  u_component_of_wind_700:
+    normalisation: "minmax"
+  u_component_of_wind_850:
+    normalisation: "minmax"
+  v_component_of_wind_500:
+    normalisation: "minmax"
+  v_component_of_wind_700:
+    normalisation: "minmax"
+  v_component_of_wind_850:
+    normalisation: "minmax"
 
 paths:
   BLUE_PEBBLE:
@@ -132,18 +129,17 @@ paths:
       STATS: '/home/melvin_aims_ac_za/data/constants/neuralgcm_Horn_Africa_2018_stats.pkl'
 
     NGCM:
-      evaporation: '/home/melvin_aims_ac_za/data/
-      precipitation_cumulative_mean: '/home/melvin_aims_ac_za/data/'
-      specific_cloud_ice_water_content_500: '/home/melvin_aims_ac_za/data/'
-      specific_cloud_ice_water_content_700: '/home/melvin_aims_ac_za/data/'
-      specific_cloud_ice_water_content_850: '/home/melvin_aims_ac_za/data/'
-      u_component_of_wind_500: '/home/melvin_aims_ac_za/data/'
-      u_component_of_wind_700: '/home/melvin_aims_ac_za/data/'
-      u_component_of_wind_850: '/home/melvin_aims_ac_za/data/'
-      v_component_of_wind_500: '/home/melvin_aims_ac_za/data/'
-      v_component_of_wind_700: '/home/melvin_aims_ac_za/data/'
-      v_component_of_wind_850: '/home/melvin_aims_ac_za/data/'
+      evaporation: '/home/melvin_aims_ac_za/data/NGCM/evaporation'
+      precipitation_cumulative_mean: '/home/melvin_aims_ac_za/data/NGCM/precipitation_cumulative_mean'
+      specific_cloud_ice_water_content_500: '/home/melvin_aims_ac_za/data/NGCM/specific_cloud_ice_water_content_500'
+      specific_cloud_ice_water_content_700: '/home/melvin_aims_ac_za/data/NGCM/specific_cloud_ice_water_content_700'
+      specific_cloud_ice_water_content_850: '/home/melvin_aims_ac_za/data/NGCM/specific_cloud_ice_water_content_850'
+      u_component_of_wind_500: '/home/melvin_aims_ac_za/data/NGCM/u_component_of_wind_500'
+      u_component_of_wind_700: '/home/melvin_aims_ac_za/data/NGCM/u_component_of_wind_700'
+      u_component_of_wind_850: '/home/melvin_aims_ac_za/data/NGCM/u_component_of_wind_850'
+      v_component_of_wind_500: '/home/melvin_aims_ac_za/data/NGCM/v_component_of_wind_500'
+      v_component_of_wind_700: '/home/melvin_aims_ac_za/data/NGCM/v_component_of_wind_700'
+      v_component_of_wind_850: '/home/melvin_aims_ac_za/data/NGCM/v_component_of_wind_850'
 
     TFRecords:
       tfrecords_path: '/home/melvin_aims_ac_za/data/tfrecords/final_tfrecord'
-
