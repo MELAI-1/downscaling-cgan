@@ -16,7 +16,7 @@ from dsrnngan.utils.read_config import get_data_paths
 
 logger = logging.getLogger(__file__)
 logger.setLevel(logging.DEBUG)
-
+AUTOTUNE = tf.data.AUTOTUNE
 return_dic = True
 
 DATA_PATHS = read_config.get_data_paths()
@@ -310,134 +310,158 @@ def _parse_batch(record_batch,
 #     else:
 #         return ds
 
-def create_dataset(data_label: str,
-                   clss: str,
-                   fcst_shape=(20, 20, 9),
-                   con_shape=(200, 200, 2),
-                   out_shape=(200, 200, 1),
-                   folder: str=records_folder,
-                   shuffle_size: int=256,
-                   repeat: bool=False,
-                   crop_size: int=None,
-                   rotate: bool=False,
-                   seed: int=None):
+
+
+def create_dataset(
+    data_label: str,
+    clss: str,
+    years: list = None,
+    fcst_shape=(20, 20, 9),
+    con_shape=(200, 200, 2),
+    out_shape=(200, 200, 1),
+    folder=None,
+    shuffle_size: int = 256,
+    repeat: bool = False,
+    crop_size: int = None,
+    rotate: bool = False,
+    seed: int = None,
+):
     """
-    Load tfrecords and parse into appropriate shapes
-    ... (docstring content) ...
+    Load TFRecords across multiple folders and filter by years.
+    
+    years: list of int, ex: [2000, 2001] pour l'entraînement.
+           Pour la validation, choisir d'autres années depuis le même dossier.
+    folder: list of directories, ou un seul string
     """
-    
-    # ----------------------------------------------------
-    # 🎯 START OF CORRECTION: Convert inputs to correct types
-    # ----------------------------------------------------
-    
-    # 1. Convert crop_size from string to int or None
+    # Convert crop_size
     if isinstance(crop_size, str):
-        if crop_size.lower() == 'none':
-            crop_size = None  # Convert 'None' string to Python None
+        if crop_size.lower() == "none":
+            crop_size = None
         else:
             try:
-                crop_size = int(crop_size) # Convert string '42' to int 42
+                crop_size = int(crop_size)
             except ValueError:
-                # This should handle unexpected values
-                print(f"Warning: Invalid crop_size string '{crop_size}'. Setting to None.")
-                crop_size = None 
+                print(f"Warning: invalid crop_size '{crop_size}', setting to None")
+                crop_size = None
 
-    # 2. Convert seed from string to int or ensure it's None/int
+    # Convert seed
     if isinstance(seed, str):
-        if seed.lower() == 'none':
-            seed = None  # Convert 'None' string to Python None
+        if seed.lower() == "none":
+            seed = None
         else:
             try:
-                seed = int(seed) # Convert string '42' to int 42
+                seed = int(seed)
             except ValueError:
-                print(f"Warning: Invalid seed string '{seed}'. Setting to None.")
+                print(f"Warning: invalid seed '{seed}', setting to None")
                 seed = None
-    
-    # ----------------------------------------------------
-    # 🎯 END OF CORRECTION
-    # ----------------------------------------------------
 
-    print(f'Creating dataset for class {clss} from folder {folder}')
-    print(f'Forecast shape: {fcst_shape}, Constant shape: {con_shape}, Output shape: {out_shape}'
-         )
-    print(f'Repeat: {repeat}, Crop size: {crop_size}, Rotate: {rotate}')
-    print("type crop size:", type(crop_size))
-    print(f'Seed: {seed}')
-    print("type of seed:", type(seed))
-    
-    # The rest of the seed logic can be simplified now:
-    int_seed = None
-    if seed:
-        if not isinstance(seed, int):
-            # This handles cases where seed might be a list/tuple of two ints 
-            # as required by stateless TF functions, taking the first element.
-            int_seed = seed[0] 
+    int_seed = seed if isinstance(seed, int) else (seed[0] if seed else None)
+
+    # Folder can be string or list
+    folder_list = [folder] if isinstance(folder, str) else list(folder)
+
+    # Gather all TFRecord files matching the years
+    all_files = []
+    for fdir in folder_list:
+        if years is None:
+            pattern = f"{data_label}_*.{clss}.*.tfrecords"
+            all_files.extend(glob.glob(os.path.join(fdir, pattern)))
         else:
-            int_seed = seed
-    
-    files_ds = tf.data.Dataset.list_files(f"{folder}/{data_label}_*.{clss}.*.tfrecords")
+            for yr in years:
+                pattern = f"{data_label}_{yr}_*.{clss}.*.tfrecords"
+                all_files.extend(glob.glob(os.path.join(fdir, pattern)))
 
-    ds = tf.data.TFRecordDataset(files_ds,num_parallel_reads=AUTOTUNE)
+    if not all_files:
+        raise FileNotFoundError(f"No TFRecords found in {folder_list} for years {years}")
 
-    # ds = ds.shuffle(shuffle_size, seed=int_seed)
+    files_ds = tf.data.Dataset.from_tensor_slices(all_files)
+    files_ds = files_ds.shuffle(len(all_files), seed=int_seed)
 
-    ds = ds.map(lambda x: _parse_batch(x,insize=fcst_shape,consize=con_shape,outsize=out_shape))
-                # num_parallel_calls=AUTOTUNE)
+    ds = tf.data.TFRecordDataset(files_ds, num_parallel_reads=AUTOTUNE)
 
-    # Now, if crop_size was the string 'None', it's now the Python None,
-    # and the 'if crop_size:' check will correctly be skipped if no cropping is desired.
-    if crop_size: 
+    # Parse
+    ds = ds.map(
+        lambda x: _parse_batch(x, insize=fcst_shape, consize=con_shape, outsize=out_shape),
+        num_parallel_calls=AUTOTUNE,
+    )
+
+    # Crop
+    if crop_size:
         if return_dic:
-            ds = ds.map(lambda x,y: _dataset_cropper_dict(x, y, crop_size=crop_size, seed=seed),
-                                                            num_parallel_calls=AUTOTUNE)
+            ds = ds.map(
+                lambda x, y: _dataset_cropper_dict(x, y, crop_size=crop_size, seed=seed),
+                num_parallel_calls=AUTOTUNE,
+            )
         else:
-            ds = ds.map(lambda x,y,z: _dataset_cropper_list(x, y, z, crop_size=crop_size, seed=seed),
-                                                                num_parallel_calls=AUTOTUNE)
+            ds = ds.map(
+                lambda x, y, z: _dataset_cropper_list(x, y, z, crop_size=crop_size, seed=seed),
+                num_parallel_calls=AUTOTUNE,
+            )
 
+    # Rotate
     if rotate:
         if return_dic:
-            ds = ds.map(lambda x,y: _dataset_rotater_dict(x, y, seed=seed),
-                                                            num_parallel_calls=AUTOTUNE)
+            ds = ds.map(
+                lambda x, y: _dataset_rotater_dict(x, y, seed=seed),
+                num_parallel_calls=AUTOTUNE,
+            )
         else:
-            ds = ds.map(lambda x,y,z: _dataset_rotater_list(x, y, z, seed=seed),
-                                                                num_parallel_calls=AUTOTUNE)
+            ds = ds.map(
+                lambda x, y, z: _dataset_rotater_list(x, y, z, seed=seed),
+                num_parallel_calls=AUTOTUNE,
+            )
+
+    return ds.repeat() if repeat else ds
 
 
-    if repeat:
-        return ds.repeat()
-    else:
-        return ds
+def create_fixed_dataset(
+    years: list = None,
+    mode: str = 'validation',
+    batch_size: int = 16,
+    downsample: bool = False,
+    fcst_shape: tuple = (20, 20, 9),
+    con_shape: tuple = (200, 200, 2),
+    out_shape: tuple = (200, 200, 1),
+    folder: str = None,
+    data_label: str = 'train',
+    clss: str = 'storm',
+):
+    """
+    Create a fixed dataset (batch) for validation or testing.
+    Selection is done via `years`.
+    """
+    folder_list = [folder] if isinstance(folder, str) else list(folder)
 
+    all_files = []
+    for fdir in folder_list:
+        if years is None:
+            pattern = f"{data_label}_*.{clss}.*.tfrecords"
+            all_files.extend(glob.glob(os.path.join(fdir, pattern)))
+        else:
+            for yr in years:
+                pattern = f"{data_label}_{yr}_*.{clss}.*.tfrecords"
+                all_files.extend(glob.glob(os.path.join(fdir, pattern)))
 
-def create_fixed_dataset(year: int=None,
-                         mode: str='validation',
-                         batch_size: int=16,
-                         downsample: bool=False,
-                         fcst_shape: tuple=(20, 20, 9),
-                         con_shape: tuple=(200, 200, 2),
-                         out_shape: tuple=(200, 200, 1),
-                         name: str=None,
-                         folder: str=records_folder):
-    assert year is not None or name is not None, "Must specify year or file name"
-    if name is None:
-        name = os.path.join(folder, f"{mode}{year}.tfrecords")
-    else:
-        name = os.path.join(folder, name)
-    fl = glob.glob(name)
-    files_ds = tf.data.Dataset.list_files(fl)
-    ds = tf.data.TFRecordDataset(files_ds,
-                                 num_parallel_reads=1)
-    ds = ds.map(lambda x: _parse_batch(x,
-                                       insize=fcst_shape,
-                                       consize=con_shape,
-                                       outsize=out_shape))
+    if not all_files:
+        raise FileNotFoundError(f"No TFRecords found in {folder_list} for years {years}")
+
+    files_ds = tf.data.Dataset.from_tensor_slices(all_files)
+    ds = tf.data.TFRecordDataset(files_ds, num_parallel_reads=1)
+
+    ds = ds.map(
+        lambda x: _parse_batch(x, insize=fcst_shape, consize=con_shape, outsize=out_shape),
+        num_parallel_calls=AUTOTUNE,
+    )
+
     ds = ds.batch(batch_size)
-    if downsample and return_dic:
-        ds = ds.map(_dataset_downsampler)
-    elif downsample and not return_dic:
-        ds = ds.map(_dataset_downsampler_list)
-    return ds
 
+    if downsample:
+        if return_dic:
+            ds = ds.map(_dataset_downsampler)
+        else:
+            ds = ds.map(_dataset_downsampler_list)
+
+    return ds
 
 def _float_feature(list_of_floats: list):  # float32
     return tf.train.Feature(float_list=tf.train.FloatList(value=list_of_floats))
