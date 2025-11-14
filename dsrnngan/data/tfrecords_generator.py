@@ -51,6 +51,10 @@ def DataGenerator(data_label, batch_size, fcst_shape, con_shape,
                                 seed=seed)
 
 
+
+
+
+
 def create_mixed_dataset(data_label: str,
                          batch_size: int,
                          fcst_shape: tuple[int, int, int],
@@ -85,7 +89,6 @@ def create_mixed_dataset(data_label: str,
         _type_: _description_
     """    
 
-##🚩why the value of classe   is 4 here?
     classes = 4
     if weights is None:
         weights = [1./classes]*classes
