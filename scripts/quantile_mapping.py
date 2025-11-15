@@ -302,7 +302,7 @@ if args.plot:
             range_dict=range_dict,
             save_path=os.path.join(args.output_folder, f'qq_plot_{data_type}_n{args.num_lat_lon_chunks}_total.pdf'))
 
-        plot_quantiles(quantile_data_dict=quantile_data_dict, min_data_points_per_quantile=args.min_points_per_quantile, format_lookup=quantile_format_dict,
+        plot_quantiles(quantile_results=quantile_results,quantile_data_dict=quantile_data_dict, min_data_points_per_quantile=args.min_points_per_quantile, format_lookup=quantile_format_dict,
                        save_path=os.path.join(args.output_folder, f'qq_plot_{data_type}_n{args.num_lat_lon_chunks}_total.pdf'))
 
         # Q-Q plot for areas
