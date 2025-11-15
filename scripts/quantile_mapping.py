@@ -121,7 +121,7 @@ quantile_data_dicts = {'test': {
 
 # NOTE:This requires data collection for the model 
 
-fps = [os.path.join(base_folder, 'n18000_201603-202009_6f02b_e1')]
+fps = [os.path.join(base_folder, 'n4_2-2_46aff_e2')]
 
 imerg_training_data = []
 cgan_training_data = []
