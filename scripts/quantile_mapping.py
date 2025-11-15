@@ -26,7 +26,7 @@ sys.path.insert(1, str(HOME / 'dsrnngan'))
 
 from dsrnngan.evaluation.benchmarks import QuantileMapper, quantile_map_grid
 from dsrnngan.utils import read_config
-from dsrnngan.evaluation.plots import plot_quantiles
+from dsrnngan.evaluation.plots import plot_quantiles ,get_quantile_data ,range_dict
 
 parser = ArgumentParser(description='Script for quantile mapping.')
 parser.add_argument('--model-eval-folder', type=str, help='Folder containing evaluated samples for the model', required=True)
@@ -297,6 +297,10 @@ if args.plot:
                     'Fcst': {'color': 'r', 'marker': '+', 'alpha': 1},
                     'Fcst + qmap': {'color': 'r', 'marker': 'o', 'alpha': 0.7},
                     'GAN + qmap': {'color': 'b', 'marker': 'o', 'alpha': 0.7}}
+        quantile_results, _, _ = get_quantile_data(
+            quantile_data_dict=quantile_data_dict,
+            range_dict=range_dict,
+            save_path=os.path.join(args.output_folder, f'qq_plot_{data_type}_n{args.num_lat_lon_chunks}_total.pdf'))
 
         plot_quantiles(quantile_data_dict=quantile_data_dict, min_data_points_per_quantile=args.min_points_per_quantile, format_lookup=quantile_format_dict,
                        save_path=os.path.join(args.output_folder, f'qq_plot_{data_type}_n{args.num_lat_lon_chunks}_total.pdf'))
