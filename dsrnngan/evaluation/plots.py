@@ -216,6 +216,7 @@ def plot_quantiles(quantile_results: dict,
                    obs_key: str='Obs (IMERG)',
                    range_dict: dict=range_dict,
                    max_quantile: float=1.0,
+                   min_data_points_per_quantile: int=50,
                    format_str='.pdf'):
     """
     Produce qauntile-quantile plot
