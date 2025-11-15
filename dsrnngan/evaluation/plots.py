@@ -160,6 +160,52 @@ def plot_fss_scores(fss_results, output_folder, output_suffix):
     plt.savefig(os.path.join(output_folder, f'fractional_skill_score_{output_suffix}.pdf'), format='pdf')
     
 
+# def get_quantile_data(quantile_data_dict: dict,
+#                    save_path: str=None, 
+#                    range_dict: dict=range_dict):
+#     """
+#     Produce qauntile-quantile plot
+
+#     Args:
+#         quantile_data_dict (dict): Dict containing entries for data sets to plot. One must have the key=obs_key. Structure:
+#                     {
+#                     data_name_1:  np.ndarray,
+#                     data_name_2:  np.ndarray
+#                     }
+#         save_path (str, optional): Path to save plots in. Defaults to None.
+#         range_dict (dict, optional): Dict containing ranges of quantiles. Defaults to range_dict.
+
+#     Returns:
+#         fig, ax: Figure and axis with plotted data.
+#     """
+
+#     quantile_results = {}
+#     quantile_values = {}
+#     intervals = {}
+    
+#     for data_name, d in quantile_data_dict.items():
+#         quantile_results[data_name] = {}
+        
+#         for k, v in tqdm(range_dict.items()):
+        
+#             boundaries = np.arange(v['start'], v['stop'], v['interval']) / 100
+            
+#             if len(boundaries) > 0:
+#                 quantile_results[data_name][k] = np.quantile(d, boundaries)
+#                 quantile_values[k] = boundaries
+
+#     # Save raw data
+#     if save_path:
+#         format_str = '.' + save_path.split('.')[-1]
+#         data_save_path = save_path.replace(format_str, '.pkl')
+        
+#         with open(data_save_path, 'wb+') as ofh:
+#             pickle.dump({'quantile_results': quantile_results,
+#                          'quantile_values': quantile_values,
+#                          'interval_list': intervals}, ofh)
+            
+#     return quantile_results, quantile_values, intervals
+
 def get_quantile_data(quantile_data_dict: dict,
                    save_path: str=None, 
                    range_dict: dict=range_dict):
@@ -198,6 +244,9 @@ def get_quantile_data(quantile_data_dict: dict,
     if save_path:
         format_str = '.' + save_path.split('.')[-1]
         data_save_path = save_path.replace(format_str, '.pkl')
+        
+        # AJOUT : Créer le dossier s'il n'existe pas
+        os.makedirs(os.path.dirname(data_save_path), exist_ok=True)
         
         with open(data_save_path, 'wb+') as ofh:
             pickle.dump({'quantile_results': quantile_results,
