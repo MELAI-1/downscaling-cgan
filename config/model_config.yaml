@@ -34,7 +34,7 @@ train:
     content_loss_weight: 1000.0
     # img_chunk_width: None
     img_chunk_width: 256
-    num_samples: 320000
+    num_samples: 32
     
 
 val:
