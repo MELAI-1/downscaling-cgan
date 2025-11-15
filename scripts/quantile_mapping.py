@@ -78,6 +78,7 @@ hours = [h[0] for h in arrays['hours']][:n_samples]
 assert len(set(list(zip(dates, hours)))) == fcst_array.shape[0], "Degenerate date/hour combinations"
 (n_samples, width, height, ensemble_size) = samples_gen_array.shape
 
+print(f'Loaded {n_samples} samples of size {width}x{height} with ensemble size {ensemble_size}', flush=True)
 ###########################
 
 ###########################
