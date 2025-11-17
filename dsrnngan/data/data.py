@@ -85,7 +85,8 @@ all_ngcm_fields=['evaporation',  'precipitation_cumulative_mean', 'specific_clou
 
 input_fields = data_config.input_fields
 constant_fields = data_config.constant_fields
-all_fcst_hours = np.array(range(24))
+# all_fcst_hours = np.array(range(24))
+all_fcst_hours = np.array([0, 6, 12, 18])
 
 # TODO: change this to behave like the IFS data load (to allow other vals of v, u etc)
 # TODO: move to a config
