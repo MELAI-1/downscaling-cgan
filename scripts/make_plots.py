@@ -229,24 +229,31 @@ all_imerg_data = []
 all_ifs_data = []
 
 if args.debug:
-    year_range = [2004]
+    year_range = [2018]
     month_range = [1]
 else:
-    year_range = range(2003, 2018)
+    year_range = range(2001, 2020)
     month_range = range(1,13)
+    day_range = range(1,32)
+    hour_range = [0,6,12,18]
 
 for year in tqdm(year_range):
     for month in month_range:
+        for day in day_range:
+            for hour in hour_range:
+                year_dir = os.path.join(args.climatological_data_path, str(year))
+                filename = f"{year}{month:02d}{day:02d}_{hour:02d}.nc"
+                full_path = os.path.join(year_dir, filename)
+        
+                imerg_ds = xr.open_dataarray(full_path)
 
-        imerg_ds = xr.open_dataarray(os.path.join(args.climatological_data_path, f'daily_imerg_rainfall_{month}_{year}.nc'))
+                imerg_data = imerg_ds.sel(lat=latitude_range, method='nearest').sel(lon=longitude_range, method='nearest').values
 
-        imerg_data = imerg_ds.sel(lat=latitude_range, method='nearest').sel(lon=longitude_range, method='nearest').values
-
-        for t in range(imerg_data.shape[0]):
+                for t in range(imerg_data.shape[0]):
             
-            snapshot = imerg_data[t, :, :]
+                    snapshot = imerg_data[t, :, :]
             
-            all_imerg_data.append(snapshot)
+                    all_imerg_data.append(snapshot)
             
 all_imerg_data = np.stack(all_imerg_data, axis = 0)
 
