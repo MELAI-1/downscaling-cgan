@@ -31,7 +31,7 @@ train:
     kl_weight: 1e-8  # used for VAEGAN
     ensemble_size: 8  # size of pred ensemble for content loss
     CL_type: "ensmeanMSE" # type of content loss to use: 'CRPS', 'CRPS_phys', 'ensmeanMSE', 'ensmeanMSE_phys' # we can change it after for the evaluation part
-    content_loss_weight: 1000.0
+    content_loss_weight: 1000.0 #for  ensemble mean MSE and 100 for CRPS
     # img_chunk_width: None
     img_chunk_width: 256
     num_samples: 320000
@@ -39,8 +39,8 @@ train:
 
 val:
     val_range: ['201502', '202012'] 
-    val_size: 100
-    ensemble_size: 20
+    val_size: 8
+    ensemble_size: 8
 
 
 
