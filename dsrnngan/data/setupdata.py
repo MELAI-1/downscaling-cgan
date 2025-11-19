@@ -45,7 +45,7 @@ def setup_batch_gen(records_folder: str,
                            records_folder=records_folder,
                            seed=seed)
 
-    # note -- using create_fixed_dataset with a batch size not divisible by 16 will cause problems [is this true?]
+    # note -- using setup_fixed_dataset with a batch size not divisible by 16 will cause problems [is this true?]
     # create_fixed_dataset will not take a list
     
     # if val:
@@ -129,6 +129,7 @@ def setup_data(data_config: SimpleNamespace,
                                           downsample=model_config.downsample,
                                           hour=hour,
                                           shuffle=shuffle)
+            
         if model_config.val.val_range is None:
             batch_gen_valid = None
         else:
@@ -154,7 +155,12 @@ def setup_data(data_config: SimpleNamespace,
             crop_size=model_config.train.crop_size,
             rotate=model_config.train.rotate,
             seed=seed)
-
+    batch_gen_valid = setup_full_image_dataset(data_config=data_config,
+                                          year_month_ranges=model_config.val.val_range,
+                                          batch_size=full_image_batch_size,
+                                          downsample=model_config.downsample,
+                                          hour=hour,
+                                          shuffle=shuffle)
     gc.collect()
     return batch_gen_train, batch_gen_valid
 
