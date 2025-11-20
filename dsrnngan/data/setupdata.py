@@ -7,6 +7,8 @@ from tqdm import tqdm
 from argparse import ArgumentParser
 from typing import Iterable, Generator
 from types import SimpleNamespace
+from typing import Union, Iterable
+
 
 from dsrnngan.data import tfrecords_generator, setupdata
 from dsrnngan.data.tfrecords_generator import DataGenerator
@@ -66,7 +68,7 @@ def setup_full_image_dataset(
                              year_month_ranges,
                              batch_size=2,
                              downsample=False,
-                             hour='random',
+                             hour=[0,6,12,18],
                              shuffle=True,
                              ):
 
@@ -93,7 +95,7 @@ def setup_data(data_config: SimpleNamespace,
                con_shape: tuple[int]=None,
                out_shape: tuple[int]=None,
                records_folder: str=None,
-               hour: str='random',
+               hour: Union[int, str, list, np.ndarray]=[0,6,12,18],
                weights: Iterable=None,
                load_full_image: bool=False,
                seed: int=None,

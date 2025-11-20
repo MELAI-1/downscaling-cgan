@@ -20,7 +20,7 @@ fields_lookup = {'ifs': all_ifs_fields, 'era5': all_era5_fields, 'ngcm': all_ngc
 
 class DataGenerator(Sequence):
     def __init__(self, dates: list, batch_size: int, data_config: SimpleNamespace,
-                 shuffle: bool=True, hour: Union[int, str, list, np.ndarray]='random',
+                 shuffle: bool=True, hour: Union[int, str, list, np.ndarray]=[0,6,12,18],
                  downsample: bool=False, repeat_data: bool=False, seed: int=None):
         
         if seed is not None:
