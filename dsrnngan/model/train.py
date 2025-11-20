@@ -206,3 +206,6 @@ def train_model(*,
                             out_fn=plot_fn)
 
     return loss_log
+
+
+#test the code 
