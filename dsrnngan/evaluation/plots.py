@@ -445,11 +445,29 @@ def plot_sequences(gen,
             if len(inputs) >= 2:
                 cond = inputs[0]
                 const = inputs[1]
-                # We ignore inputs[2] (e.g., noise) if present, fixing the "too many values" error
+                # We ignore inputs[2] (e.g., noise) if present
             else:
                 raise ValueError(f"Inputs expected to have at least 2 elements (cond, const), got {len(inputs)}")
+        elif isinstance(inputs, dict):
+            # --- FIX START: Handle dictionary inputs ---
+            # Attempt to find specific keys used in DSRNNGAN/TF generators
+            # 'lo_res_inputs' usually maps to cond, 'const_inputs' to const
+            if 'lo_res_inputs' in inputs and 'const_inputs' in inputs:
+                cond = inputs['lo_res_inputs']
+                const = inputs['const_inputs']
+            else:
+                # Fallback: If specific keys aren't found, assume the values 
+                # are in the order [cond, const]
+                print(f"Warning: Received input dict with keys {list(inputs.keys())}. "
+                      "Assuming values are ordered [cond, const].")
+                vals = list(inputs.values())
+                if len(vals) >= 2:
+                    cond = vals[0]
+                    const = vals[1]
+                else:
+                    raise ValueError(f"Input dict has fewer than 2 values: {list(inputs.keys())}")
+            # --- FIX END ---
         else:
-            # Fallback if inputs is not a list (unexpected)
              raise ValueError(f"Unexpected input format: {type(inputs)}")
     else:
         raise ValueError(f"Unexpected data structure from generator. Length: {len(data_batch)}")
@@ -510,7 +528,7 @@ def plot_sequences(gen,
         # plt.savefig(out_fn + f'-ckpt{checkpoint}.pdf', bbox_inches='tight')
         plt.savefig(out_fn+f"_{checkpoint}.pdf", bbox_inches='tight')
         plt.close()
-
+        
 def plot_rank_histogram(ax, ranks, N_ranks=101, **plot_params):
 
     bc = np.linspace(0, 1, N_ranks)
