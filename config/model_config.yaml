@@ -34,7 +34,7 @@ train:
     content_loss_weight: 1000.0 #for  ensemble mean MSE and 100 for CRPS
     # img_chunk_width: None
     img_chunk_width: 256
-    num_samples: 225520
+    num_samples: 100
     
 
 val:
