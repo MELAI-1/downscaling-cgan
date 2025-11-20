@@ -17,6 +17,13 @@ import cartopy.feature as cfeature
 from cartopy.feature import NaturalEarthFeature, auto_scaler, AdaptiveScaler
 from shapely.geometry import Polygon, LineString
 
+from dsrnngan.utils import read_config
+
+data_config = read_config.read_data_config()
+DATA_PATHS = read_config.get_data_paths()
+NGCM_NORMALISATION_STRATEGY = data_config.ngcm_input_normalisation_strategy
+
+
 # See https://matplotlib.org/stable/gallery/color/named_colors.html for edge colour options
 lake_feature = cfeature.NaturalEarthFeature(
     'physical', 'lakes',
@@ -403,7 +410,6 @@ def truncate_colourmap(cmap, minval=0.0, maxval=1.0, n=100):
         cmap(np.linspace(minval, maxval, n)))
     return new_cmap
 
-
 def plot_sequences(gen,
                    mode,
                    batch_gen,
@@ -416,82 +422,54 @@ def plot_sequences(gen,
 
     print("\n--- DEBUG PLOTS: Entrée dans plot_sequences ---")
 
-    # ---------------------------------------------------------
-    # 1. CORRECTION ITERATEUR (Fixes AttributeError)
-    # ---------------------------------------------------------
+    # 1. GESTION ITERATEUR
     if hasattr(batch_gen, 'as_numpy_iterator'):
-        print("DEBUG PLOTS: Utilisation de .as_numpy_iterator() (TF Dataset)")
         iterator = batch_gen.as_numpy_iterator()
     else:
-        print("DEBUG PLOTS: Utilisation de iter() standard (Python/Keras Generator)")
         iterator = iter(batch_gen)
 
-    # ---------------------------------------------------------
     # 2. RECUPERATION DU PREMIER BATCH
-    # ---------------------------------------------------------
     try:
         data_batch = next(iterator)
-        print(f"DEBUG PLOTS: Batch récupéré avec succès. Type: {type(data_batch)}")
     except StopIteration:
         print("DEBUG PLOTS: Le générateur est vide.")
         return
-    except Exception as e:
-        print(f"DEBUG PLOTS: Erreur lors du fetch du batch: {e}")
-        raise e
 
-    # ---------------------------------------------------------
-    # 3. DEMELAGE DES DONNEES (Unpacking Tuple vs Dict)
-    # ---------------------------------------------------------
+    # 3. EXTRACTION DES DONNEES
     cond, const, seq_real = None, None, None
 
-    # Cas A : Tuple de 3 éléments (cond, const, target) - Format historique
     if len(data_batch) == 3:
         cond, const, seq_real = data_batch
-        print("DEBUG PLOTS: Format (cond, const, target) détecté.")
-
-    # Cas B : Tuple de 2 éléments (inputs, target) - Format Keras Standard
     elif len(data_batch) == 2:
         inputs, seq_real = data_batch
-        print(f"DEBUG PLOTS: Format (inputs, target) détecté. Type inputs: {type(inputs)}")
-
-        if isinstance(inputs, dict):
-            # Gestion des Dictionnaires (Fixes ValueError previous)
-            print(f"DEBUG PLOTS: Clés trouvées: {inputs.keys()}")
-            if 'lo_res_inputs' in inputs and 'const_inputs' in inputs:
-                cond = inputs['lo_res_inputs']
-                const = inputs['const_inputs']
-            else:
-                # Fallback si les clés ne sont pas celles attendues
-                print("WARNING PLOTS: Clés non standards. Utilisation de l'ordre des valeurs.")
-                vals = list(inputs.values())
-                cond = vals[0]
-                const = vals[1]
         
+        if isinstance(inputs, dict):
+            # Récupération Inputs
+            if 'lo_res_inputs' in inputs: cond = inputs['lo_res_inputs']
+            else: cond = list(inputs.values())[0]
+
+            # Récupération Constantes
+            if 'const_inputs' in inputs: const = inputs['const_inputs']
+            elif 'hi_res_inputs' in inputs: const = inputs['hi_res_inputs'] 
+            else: const = list(inputs.values())[1] if len(inputs) > 1 else None
+
         elif isinstance(inputs, (list, tuple)):
-            # Gestion des Listes
             cond = inputs[0]
             const = inputs[1]
-    
-    # Cas C : Dictionnaire pur (Rare mais possible)
-    elif isinstance(data_batch, dict):
-        print("DEBUG PLOTS: Format Dictionnaire pur détecté.")
-        if 'lo_res_inputs' in data_batch: cond = data_batch['lo_res_inputs']
-        if 'const_inputs' in data_batch: const = data_batch['const_inputs']
-        # Essai de trouver la target
-        seq_real = data_batch.get('output', data_batch.get('hi_res_inputs', cond))
 
-    # Vérification de sécurité
-    if cond is None or const is None:
-        raise ValueError(f"Impossible d'extraire les données cond/const. Batch type: {type(data_batch)}")
+    # Fallback si target manquante
+    if seq_real is None and isinstance(data_batch, dict):
+        seq_real = data_batch.get('output', data_batch.get('hi_res_inputs'))
 
-    print(f"DEBUG PLOTS: Dimensions -> Cond: {cond.shape}, Const: {const.shape}")
-    
-    # ---------------------------------------------------------
-    # 4. GENERATION ET PLOTTING (Code original)
-    # ---------------------------------------------------------
+    if cond is None:
+        raise ValueError("Erreur critique : Impossible de récupérer les données d'entrée (cond).")
+
+    print(f"DEBUG PLOTS: Dimensions -> Cond: {cond.shape}, Const: {const.shape if const is not None else 'None'}")
+
+    # 4. GENERATION DES PREDICTIONS
     batch_size = cond.shape[0]
-    
     seq_gen = []
+    
     if mode == 'GAN':
         for i in range(num_instances):
             noise_shape = cond[0, ..., 0].shape + (noise_channels,)
@@ -501,50 +479,99 @@ def plot_sequences(gen,
         for i in range(num_instances):
             seq_gen.append(gen.predict([cond, const]))
     elif mode == 'VAEGAN':
-        # call encoder
         (mean, logvar) = gen.encoder([cond, const])
-        # run decoder n times
         for i in range(num_instances):
             noise_shape = cond[0, ..., 0].shape + (latent_variables,)
             noise_gen = NoiseGenerator(noise_shape, batch_size=batch_size)
             seq_gen.append(gen.decoder.predict([mean, logvar, noise_gen(), const]))
 
-    seq_real = data.denormalise(seq_real)
-    cond = data.denormalise(cond)
-    seq_gen = [data.denormalise(seq) for seq in seq_gen]
+    # ----------------------------------------------------------------------
+    # 5. DENORMALISATION DYNAMIQUE (CORRECTION)
+    # ----------------------------------------------------------------------
+    
+    # A. Identifier les stratégies de normalisation
+    # On accède aux dictionnaires définis dans dsrnngan.data.data
+    
+    # Variable Cible (Target) : 'precipitation_cumulative_mean'
+    target_var_name = 'precipitation_cumulative_mean'
+    # On cherche la stratégie dans le lookup. Si pas trouvé, 'log' par défaut.
+    # Note: on utilise data.VAR_LOOKUP_NGCM car VAR_LOOKUP_NGCM est dans data.py
+    try:
+        target_norm_strat = data.VAR_LOOKUP_NGCM.get(target_var_name, {}).get('normalisation', 'log')
+    except AttributeError:
+        # Si VAR_LOOKUP_NGCM n'est pas accessible directement, on hardcode le fallback
+        print("WARNING: data.VAR_LOOKUP_NGCM non accessible. Utilisation de 'log' par défaut.")
+        target_norm_strat = 'log'
 
+    # Variable Input (Cond) : On affiche le canal 0. 
+    # D'après votre liste all_ngcm_fields, l'index 0 est 'evaporation'.
+    try:
+        input_var_name = data.all_ngcm_fields[0] # Devrait être 'evaporation'
+        input_norm_strat = data.VAR_LOOKUP_NGCM.get(input_var_name, {}).get('normalisation', 'log')
+    except (AttributeError, IndexError):
+        print("WARNING: data.all_ngcm_fields non accessible. Utilisation de 'log' par défaut pour l'input.")
+        input_norm_strat = 'log'
+
+    print(f"DEBUG PLOTS: Stratégie Target ({target_var_name}): {target_norm_strat}")
+    print(f"DEBUG PLOTS: Stratégie Input ({input_var_name}): {input_norm_strat}")
+
+    # B. Appliquer la dénormalisation
+    # Pour seq_real et seq_gen (Précipitation) -> on utilise target_norm_strat
+    seq_real = data.denormalise(seq_real, normalisation_type=target_norm_strat)
+    seq_gen = [data.denormalise(seq, normalisation_type=target_norm_strat) for seq in seq_gen]
+
+    # Pour cond (Input)
+    # ATTENTION : cond contient 11 canaux avec des normalisations différentes (log et minmax).
+    # data.denormalise applique la stratégie à TOUT le tenseur.
+    # Si on applique 'log' à tout cond, les vents (minmax) seront faussés.
+    # MAIS, comme plot_sequences n'affiche que le canal 0 (evaporation/log) plus bas, 
+    # c'est acceptable pour la visualisation de dénormaliser cond avec la stratégie du canal 0.
+    cond = data.denormalise(cond, normalisation_type=input_norm_strat)
+
+    # ----------------------------------------------------------------------
+
+    # 6. AFFICHAGE
     num_rows = num_samples
-    num_cols = 2+num_instances
-
+    num_cols = 2 + num_instances
     figsize = (num_cols*1.5, num_rows*1.5)
     plt.figure(figsize=figsize)
 
-    gs = gridspec.GridSpec(num_rows, num_cols,
-                           wspace=0.05, hspace=0.05)
-
-    value_range = (0, 5)  # batch_gen.decoder.value_range
+    gs = gridspec.GridSpec(num_rows, num_cols, wspace=0.05, hspace=0.05)
     
-    # Sécurité pour ne pas dépasser la taille du batch
+    # Plage de valeurs (ex: 0 à 10 mm/h pour la pluie, ou 0 à 1 pour l'évap)
+    # Vous pouvez ajuster ceci ou le rendre dynamique
+    value_range = (0, 5) 
+    
     actual_samples = min(num_samples, batch_size)
 
     for s in range(actual_samples):
         i = s
+        
+        # Colonne 1 : Target (Précipitation)
+        # seq_real peut être (batch, h, w, 1) ou (batch, h, w)
         plt.subplot(gs[i, 0])
-        plot_img(seq_real[s, :, :, 0], value_range=value_range)
+        real_data = seq_real[s, :, :, 0] if seq_real.ndim == 4 else seq_real[s, :, :]
+        plot_img(real_data, value_range=value_range)
+        
+        # Colonne 2 : Input (Canal 0 -> Evaporation)
         plt.subplot(gs[i, 1])
-        plot_img(cond[s, :, :, 0], value_range=value_range)
+        input_data = cond[s, :, :, 0] if cond.ndim == 4 else cond[s, :, :]
+        plot_img(input_data, value_range=value_range)
+        
+        # Colonnes suivantes : Predictions
         for k in range(num_instances):
             j = 2+k
             plt.subplot(gs[i, j])
-            plot_img(seq_gen[k][s, :, :, 0], value_range=value_range)
+            gen_data = seq_gen[k][s, :, :, 0] if seq_gen[k].ndim == 4 else seq_gen[k][s, :, :]
+            plot_img(gen_data, value_range=value_range)
 
     plt.suptitle('Checkpoint ' + str(checkpoint))
 
     if out_fn is not None:
-        # Ajout du suffixe checkpoint pour éviter d'écraser
         plt.savefig(out_fn+f"_{checkpoint}.pdf", bbox_inches='tight')
         plt.close()
-    
+        
+    print("DEBUG PLOTS: Sauvegarde terminée.")
     print("DEBUG PLOTS: Plot terminé avec succès.\n")
     
 def plot_rank_histogram(ax, ranks, N_ranks=101, **plot_params):
