@@ -17,6 +17,13 @@ import cartopy.feature as cfeature
 from cartopy.feature import NaturalEarthFeature, auto_scaler, AdaptiveScaler
 from shapely.geometry import Polygon, LineString
 
+from dsrnngan.utils import read_config, utils
+from dsrnngan.data import data
+from dsrnngan.model.noise import NoiseGenerator
+from dsrnngan.evaluation.rapsd import plot_spectrum1d, rapsd
+from dsrnngan.evaluation.thresholded_ranks import findthresh
+from dsrnngan.evaluation import scoring
+
 # See https://matplotlib.org/stable/gallery/color/named_colors.html for edge colour options
 lake_feature = cfeature.NaturalEarthFeature(
     'physical', 'lakes',
@@ -61,13 +68,6 @@ disputed_border_feature = DisputedBorders('cultural',
                                      edgecolor='black', 
                                      facecolor='never',
                                      linestyle='--')
-
-from dsrnngan.utils import read_config, utils
-from dsrnngan.data import data
-from dsrnngan.model.noise import NoiseGenerator
-from dsrnngan.evaluation.rapsd import plot_spectrum1d, rapsd
-from dsrnngan.evaluation.thresholded_ranks import findthresh
-from dsrnngan.evaluation import scoring
 
 path = os.path.dirname(os.path.abspath(__file__))
 
@@ -158,53 +158,6 @@ def plot_fss_scores(fss_results, output_folder, output_suffix):
         ax.legend()
         
     plt.savefig(os.path.join(output_folder, f'fractional_skill_score_{output_suffix}.pdf'), format='pdf')
-    
-
-# def get_quantile_data(quantile_data_dict: dict,
-#                    save_path: str=None, 
-#                    range_dict: dict=range_dict):
-#     """
-#     Produce qauntile-quantile plot
-
-#     Args:
-#         quantile_data_dict (dict): Dict containing entries for data sets to plot. One must have the key=obs_key. Structure:
-#                     {
-#                     data_name_1:  np.ndarray,
-#                     data_name_2:  np.ndarray
-#                     }
-#         save_path (str, optional): Path to save plots in. Defaults to None.
-#         range_dict (dict, optional): Dict containing ranges of quantiles. Defaults to range_dict.
-
-#     Returns:
-#         fig, ax: Figure and axis with plotted data.
-#     """
-
-#     quantile_results = {}
-#     quantile_values = {}
-#     intervals = {}
-    
-#     for data_name, d in quantile_data_dict.items():
-#         quantile_results[data_name] = {}
-        
-#         for k, v in tqdm(range_dict.items()):
-        
-#             boundaries = np.arange(v['start'], v['stop'], v['interval']) / 100
-            
-#             if len(boundaries) > 0:
-#                 quantile_results[data_name][k] = np.quantile(d, boundaries)
-#                 quantile_values[k] = boundaries
-
-#     # Save raw data
-#     if save_path:
-#         format_str = '.' + save_path.split('.')[-1]
-#         data_save_path = save_path.replace(format_str, '.pkl')
-        
-#         with open(data_save_path, 'wb+') as ofh:
-#             pickle.dump({'quantile_results': quantile_results,
-#                          'quantile_values': quantile_values,
-#                          'interval_list': intervals}, ofh)
-            
-#     return quantile_results, quantile_values, intervals
 
 def get_quantile_data(quantile_data_dict: dict,
                    save_path: str=None, 
@@ -464,9 +417,7 @@ def plot_sequences(gen,
                    num_instances=4,
                    out_fn=None):
 
-    # --- FIX START ---
     # Create an iterator from the batch_gen object
-    # This works whether it is a generic Python generator, a Keras Sequence, or a TF Dataset
     if hasattr(batch_gen, 'as_numpy_iterator'):
         # It is a tf.data.Dataset
         iterator = batch_gen.as_numpy_iterator()
@@ -485,15 +436,26 @@ def plot_sequences(gen,
     # Case 1: Generator returns (cond, const, seq_real) flattened
     if len(data_batch) == 3:
         cond, const, seq_real = data_batch
-    # Case 2: Generator returns ((cond, const), seq_real) - Standard Keras format
+    # Case 2: Generator returns (inputs, seq_real) - Standard Keras format
     elif len(data_batch) == 2:
-        (cond, const), seq_real = data_batch
+        inputs, seq_real = data_batch
+        
+        # Robust unpacking of inputs
+        if isinstance(inputs, (list, tuple)):
+            if len(inputs) >= 2:
+                cond = inputs[0]
+                const = inputs[1]
+                # We ignore inputs[2] (e.g., noise) if present, fixing the "too many values" error
+            else:
+                raise ValueError(f"Inputs expected to have at least 2 elements (cond, const), got {len(inputs)}")
+        else:
+            # Fallback if inputs is not a list (unexpected)
+             raise ValueError(f"Unexpected input format: {type(inputs)}")
     else:
         raise ValueError(f"Unexpected data structure from generator. Length: {len(data_batch)}")
-    
-    batch_size = cond.shape[0]
-    # --- FIX END ---
 
+    batch_size = cond.shape[0]
+    
     seq_gen = []
     if mode == 'GAN':
         for i in range(num_instances):
