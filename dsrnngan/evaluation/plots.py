@@ -17,13 +17,6 @@ import cartopy.feature as cfeature
 from cartopy.feature import NaturalEarthFeature, auto_scaler, AdaptiveScaler
 from shapely.geometry import Polygon, LineString
 
-from dsrnngan.utils import read_config, utils
-from dsrnngan.data import data
-from dsrnngan.model.noise import NoiseGenerator
-from dsrnngan.evaluation.rapsd import plot_spectrum1d, rapsd
-from dsrnngan.evaluation.thresholded_ranks import findthresh
-from dsrnngan.evaluation import scoring
-
 # See https://matplotlib.org/stable/gallery/color/named_colors.html for edge colour options
 lake_feature = cfeature.NaturalEarthFeature(
     'physical', 'lakes',
@@ -68,6 +61,13 @@ disputed_border_feature = DisputedBorders('cultural',
                                      edgecolor='black', 
                                      facecolor='never',
                                      linestyle='--')
+
+from dsrnngan.utils import read_config, utils
+from dsrnngan.data import data
+from dsrnngan.model.noise import NoiseGenerator
+from dsrnngan.evaluation.rapsd import plot_spectrum1d, rapsd
+from dsrnngan.evaluation.thresholded_ranks import findthresh
+from dsrnngan.evaluation import scoring
 
 path = os.path.dirname(os.path.abspath(__file__))
 
@@ -158,6 +158,7 @@ def plot_fss_scores(fss_results, output_folder, output_suffix):
         ax.legend()
         
     plt.savefig(os.path.join(output_folder, f'fractional_skill_score_{output_suffix}.pdf'), format='pdf')
+    
 
 def get_quantile_data(quantile_data_dict: dict,
                    save_path: str=None, 
@@ -198,9 +199,6 @@ def get_quantile_data(quantile_data_dict: dict,
         format_str = '.' + save_path.split('.')[-1]
         data_save_path = save_path.replace(format_str, '.pkl')
         
-        # AJOUT : Créer le dossier s'il n'existe pas
-        os.makedirs(os.path.dirname(data_save_path), exist_ok=True)
-        
         with open(data_save_path, 'wb+') as ofh:
             pickle.dump({'quantile_results': quantile_results,
                          'quantile_values': quantile_values,
@@ -218,7 +216,6 @@ def plot_quantiles(quantile_results: dict,
                    obs_key: str='Obs (IMERG)',
                    range_dict: dict=range_dict,
                    max_quantile: float=1.0,
-                   min_data_points_per_quantile: int=50,
                    format_str='.pdf'):
     """
     Produce qauntile-quantile plot
@@ -417,63 +414,9 @@ def plot_sequences(gen,
                    num_instances=4,
                    out_fn=None):
 
-    # Create an iterator from the batch_gen object
-    if hasattr(batch_gen, 'as_numpy_iterator'):
-        # It is a tf.data.Dataset
-        iterator = batch_gen.as_numpy_iterator()
-    else:
-        # It is a standard Python generator or Keras Sequence
-        iterator = iter(batch_gen)
+    for cond, const, seq_real in batch_gen.as_numpy_iterator():
+        batch_size = cond.shape[0]
 
-    # Grab the first batch only
-    try:
-        data_batch = next(iterator)
-    except StopIteration:
-        print("Generator is empty.")
-        return
-
-    # Handle different data structures (Unpacking)
-    # Case 1: Generator returns (cond, const, seq_real) flattened
-    if len(data_batch) == 3:
-        cond, const, seq_real = data_batch
-    # Case 2: Generator returns (inputs, seq_real) - Standard Keras format
-    elif len(data_batch) == 2:
-        inputs, seq_real = data_batch
-        
-        # Robust unpacking of inputs
-        if isinstance(inputs, (list, tuple)):
-            if len(inputs) >= 2:
-                cond = inputs[0]
-                const = inputs[1]
-                # We ignore inputs[2] (e.g., noise) if present
-            else:
-                raise ValueError(f"Inputs expected to have at least 2 elements (cond, const), got {len(inputs)}")
-        elif isinstance(inputs, dict):
-            # --- FIX START: Handle dictionary inputs ---
-            # Attempt to find specific keys used in DSRNNGAN/TF generators
-            # 'lo_res_inputs' usually maps to cond, 'const_inputs' to const
-            if 'lo_res_inputs' in inputs and 'const_inputs' in inputs:
-                cond = inputs['lo_res_inputs']
-                const = inputs['const_inputs']
-            else:
-                # Fallback: If specific keys aren't found, assume the values 
-                # are in the order [cond, const]
-                print(f"Warning: Received input dict with keys {list(inputs.keys())}. "
-                      "Assuming values are ordered [cond, const].")
-                vals = list(inputs.values())
-                if len(vals) >= 2:
-                    cond = vals[0]
-                    const = vals[1]
-                else:
-                    raise ValueError(f"Input dict has fewer than 2 values: {list(inputs.keys())}")
-            # --- FIX END ---
-        else:
-             raise ValueError(f"Unexpected input format: {type(inputs)}")
-    else:
-        raise ValueError(f"Unexpected data structure from generator. Length: {len(data_batch)}")
-
-    batch_size = cond.shape[0]
-    
     seq_gen = []
     if mode == 'GAN':
         for i in range(num_instances):
@@ -507,10 +450,7 @@ def plot_sequences(gen,
 
     value_range = (0, 5)  # batch_gen.decoder.value_range
 
-    # Ensure we don't try to plot more samples than exist in the batch
-    actual_samples = min(num_samples, batch_size)
-
-    for s in range(actual_samples):
+    for s in range(num_samples):
         i = s
         plt.subplot(gs[i, 0])
         plot_img(seq_real[s, :, :, 0], value_range=value_range)
@@ -525,10 +465,10 @@ def plot_sequences(gen,
 
     if out_fn is not None:
         # plt.savefig(out_fn, bbox_inches='tight')
-        # plt.savefig(out_fn + f'-ckpt{checkpoint}.pdf', bbox_inches='tight')
         plt.savefig(out_fn+f"_{checkpoint}.pdf", bbox_inches='tight')
         plt.close()
-        
+
+
 def plot_rank_histogram(ax, ranks, N_ranks=101, **plot_params):
 
     bc = np.linspace(0, 1, N_ranks)
