@@ -464,8 +464,35 @@ def plot_sequences(gen,
                    num_instances=4,
                    out_fn=None):
 
-    for cond, const, seq_real in batch_gen.as_numpy_iterator():
-        batch_size = cond.shape[0]
+    # --- FIX START ---
+    # Create an iterator from the batch_gen object
+    # This works whether it is a generic Python generator, a Keras Sequence, or a TF Dataset
+    if hasattr(batch_gen, 'as_numpy_iterator'):
+        # It is a tf.data.Dataset
+        iterator = batch_gen.as_numpy_iterator()
+    else:
+        # It is a standard Python generator or Keras Sequence
+        iterator = iter(batch_gen)
+
+    # Grab the first batch only
+    try:
+        data_batch = next(iterator)
+    except StopIteration:
+        print("Generator is empty.")
+        return
+
+    # Handle different data structures (Unpacking)
+    # Case 1: Generator returns (cond, const, seq_real) flattened
+    if len(data_batch) == 3:
+        cond, const, seq_real = data_batch
+    # Case 2: Generator returns ((cond, const), seq_real) - Standard Keras format
+    elif len(data_batch) == 2:
+        (cond, const), seq_real = data_batch
+    else:
+        raise ValueError(f"Unexpected data structure from generator. Length: {len(data_batch)}")
+    
+    batch_size = cond.shape[0]
+    # --- FIX END ---
 
     seq_gen = []
     if mode == 'GAN':
@@ -500,7 +527,10 @@ def plot_sequences(gen,
 
     value_range = (0, 5)  # batch_gen.decoder.value_range
 
-    for s in range(num_samples):
+    # Ensure we don't try to plot more samples than exist in the batch
+    actual_samples = min(num_samples, batch_size)
+
+    for s in range(actual_samples):
         i = s
         plt.subplot(gs[i, 0])
         plot_img(seq_real[s, :, :, 0], value_range=value_range)
@@ -518,7 +548,6 @@ def plot_sequences(gen,
         # plt.savefig(out_fn + f'-ckpt{checkpoint}.pdf', bbox_inches='tight')
         plt.savefig(out_fn+f"_{checkpoint}.pdf", bbox_inches='tight')
         plt.close()
-
 
 def plot_rank_histogram(ax, ranks, N_ranks=101, **plot_params):
 
