@@ -414,9 +414,83 @@ def plot_sequences(gen,
                    num_instances=4,
                    out_fn=None):
 
-    for cond, const, seq_real in batch_gen.as_numpy_iterator():
-        batch_size = cond.shape[0]
+    print("\n--- DEBUG PLOTS: Entrée dans plot_sequences ---")
 
+    # ---------------------------------------------------------
+    # 1. CORRECTION ITERATEUR (Fixes AttributeError)
+    # ---------------------------------------------------------
+    if hasattr(batch_gen, 'as_numpy_iterator'):
+        print("DEBUG PLOTS: Utilisation de .as_numpy_iterator() (TF Dataset)")
+        iterator = batch_gen.as_numpy_iterator()
+    else:
+        print("DEBUG PLOTS: Utilisation de iter() standard (Python/Keras Generator)")
+        iterator = iter(batch_gen)
+
+    # ---------------------------------------------------------
+    # 2. RECUPERATION DU PREMIER BATCH
+    # ---------------------------------------------------------
+    try:
+        data_batch = next(iterator)
+        print(f"DEBUG PLOTS: Batch récupéré avec succès. Type: {type(data_batch)}")
+    except StopIteration:
+        print("DEBUG PLOTS: Le générateur est vide.")
+        return
+    except Exception as e:
+        print(f"DEBUG PLOTS: Erreur lors du fetch du batch: {e}")
+        raise e
+
+    # ---------------------------------------------------------
+    # 3. DEMELAGE DES DONNEES (Unpacking Tuple vs Dict)
+    # ---------------------------------------------------------
+    cond, const, seq_real = None, None, None
+
+    # Cas A : Tuple de 3 éléments (cond, const, target) - Format historique
+    if len(data_batch) == 3:
+        cond, const, seq_real = data_batch
+        print("DEBUG PLOTS: Format (cond, const, target) détecté.")
+
+    # Cas B : Tuple de 2 éléments (inputs, target) - Format Keras Standard
+    elif len(data_batch) == 2:
+        inputs, seq_real = data_batch
+        print(f"DEBUG PLOTS: Format (inputs, target) détecté. Type inputs: {type(inputs)}")
+
+        if isinstance(inputs, dict):
+            # Gestion des Dictionnaires (Fixes ValueError previous)
+            print(f"DEBUG PLOTS: Clés trouvées: {inputs.keys()}")
+            if 'lo_res_inputs' in inputs and 'const_inputs' in inputs:
+                cond = inputs['lo_res_inputs']
+                const = inputs['const_inputs']
+            else:
+                # Fallback si les clés ne sont pas celles attendues
+                print("WARNING PLOTS: Clés non standards. Utilisation de l'ordre des valeurs.")
+                vals = list(inputs.values())
+                cond = vals[0]
+                const = vals[1]
+        
+        elif isinstance(inputs, (list, tuple)):
+            # Gestion des Listes
+            cond = inputs[0]
+            const = inputs[1]
+    
+    # Cas C : Dictionnaire pur (Rare mais possible)
+    elif isinstance(data_batch, dict):
+        print("DEBUG PLOTS: Format Dictionnaire pur détecté.")
+        if 'lo_res_inputs' in data_batch: cond = data_batch['lo_res_inputs']
+        if 'const_inputs' in data_batch: const = data_batch['const_inputs']
+        # Essai de trouver la target
+        seq_real = data_batch.get('output', data_batch.get('hi_res_inputs', cond))
+
+    # Vérification de sécurité
+    if cond is None or const is None:
+        raise ValueError(f"Impossible d'extraire les données cond/const. Batch type: {type(data_batch)}")
+
+    print(f"DEBUG PLOTS: Dimensions -> Cond: {cond.shape}, Const: {const.shape}")
+    
+    # ---------------------------------------------------------
+    # 4. GENERATION ET PLOTTING (Code original)
+    # ---------------------------------------------------------
+    batch_size = cond.shape[0]
+    
     seq_gen = []
     if mode == 'GAN':
         for i in range(num_instances):
@@ -449,8 +523,11 @@ def plot_sequences(gen,
                            wspace=0.05, hspace=0.05)
 
     value_range = (0, 5)  # batch_gen.decoder.value_range
+    
+    # Sécurité pour ne pas dépasser la taille du batch
+    actual_samples = min(num_samples, batch_size)
 
-    for s in range(num_samples):
+    for s in range(actual_samples):
         i = s
         plt.subplot(gs[i, 0])
         plot_img(seq_real[s, :, :, 0], value_range=value_range)
@@ -464,11 +541,12 @@ def plot_sequences(gen,
     plt.suptitle('Checkpoint ' + str(checkpoint))
 
     if out_fn is not None:
-        # plt.savefig(out_fn, bbox_inches='tight')
+        # Ajout du suffixe checkpoint pour éviter d'écraser
         plt.savefig(out_fn+f"_{checkpoint}.pdf", bbox_inches='tight')
         plt.close()
-
-
+    
+    print("DEBUG PLOTS: Plot terminé avec succès.\n")
+    
 def plot_rank_histogram(ax, ranks, N_ranks=101, **plot_params):
 
     bc = np.linspace(0, 1, N_ranks)
