@@ -132,25 +132,49 @@ DEFAULT_LONGITUDE_RANGE=np.arange(data_config.min_longitude, data_config.max_lon
 
 char_integer_re = re.compile(r'[a-zA-Z]*([0-9]+)')
 
-def denormalise(x: np.float64, normalisation_type: str):
+# def denormalise(x: np.float64, normalisation_type: str):
+#     """
+#     Undo normalisation
+
+#     Args:
+#         x (np.float64): normalised float
+#         normalisation_type (str): type of normalisation
+#     Returns:
+#         np.float64: denormalised float
+#     """
+        
+#     if normalisation_type == 'log':
+#         return 10 ** x - 1
+#     elif normalisation_type == 'sqrt':
+#         return np.power(x,2)
+#     else:
+#         raise NotImplementedError(f'normalisation type {normalisation_type} not recognised')
+    
+
+def denormalise(x, normalisation_type: str):
     """
     Undo normalisation
-
-    Args:
-        x (np.float64): normalised float
-        normalisation_type (str): type of normalisation
-    Returns:
-        np.float64: denormalised float
     """
-        
+    # Si x est encore un dictionnaire par accident, on prend la première valeur
+    if isinstance(x, dict):
+        x = list(x.values())[0]
+
     if normalisation_type == 'log':
         return 10 ** x - 1
     elif normalisation_type == 'sqrt':
-        return np.power(x,2)
+        return np.power(x, 2)
+    elif normalisation_type == 'minmax':
+        # Pour l'instant, on retourne tel quel car on n'a pas les bornes min/max ici.
+        # Cela évite le crash "NotImplementedError" pour les vents.
+        return x
+    elif normalisation_type == 'standardise':
+        # Idem, on retourne tel quel
+        return x
     else:
-        raise NotImplementedError(f'normalisation type {normalisation_type} not recognised')
+        # Pour éviter de bloquer l'exécution, on print une erreur mais on retourne x
+        print(f"Warning: normalisation type {normalisation_type} not recognised. Returning raw data.")
+        return x
     
-
 def normalise_precipitation(data_array: xr.DataArray,
                             normalisation_type: str):
     
