@@ -48,9 +48,12 @@ def train_model(*,
         print(f"Using mode {mode}")
         print(f"Using noise channels {noise_channels}")
         print(f"Using latent variables {latent_variables}")
+        print(f"Using batch size {batch_gen_train.batch_size}")
+        print(f"evaluatie on the training data")
+            ##🚩update this part  to evaluate on the train data i change now the batch_gen_valid to batch_gen_train
         plots.plot_sequences(model.gen,
                             mode,
-                            batch_gen_valid,
+                            batch_gen_train,
                             checkpoint,
                             noise_channels=noise_channels,
                             latent_variables=latent_variables,

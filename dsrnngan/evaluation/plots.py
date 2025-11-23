@@ -410,6 +410,255 @@ def truncate_colourmap(cmap, minval=0.0, maxval=1.0, n=100):
         cmap(np.linspace(minval, maxval, n)))
     return new_cmap
 
+
+# def plot_sequences(gen,
+#                    mode,
+#                    batch_gen,
+#                    checkpoint,
+#                    noise_channels,
+#                    latent_variables,
+#                    num_samples=8,
+#                    num_instances=4,
+#                    out_fn=None):
+    
+#     ## 🚩 Just for debugging 
+#     print("\n--- DEBUG PLOTS: Enter in plot sequences ---")
+
+#     ## 🚩 Preparation of the iterator
+#     if hasattr(batch_gen, 'as_numpy_iterator'):
+#         iterator = batch_gen.as_numpy_iterator()
+#     else:
+#         iterator = iter(batch_gen)
+
+#     ## 🚩 Try to get one batch 
+#     try:
+#         data_batch = next(iterator)
+#     except StopIteration:
+#         print("DEBUG PLOTS: The generator is empty.")
+#         return
+
+#     ## 🚩 Extraction of the data from the batch 
+#     cond, const, seq_real = None, None, None
+#     inputs = None # Temporary variable for inputs structure
+
+#     if isinstance(data_batch, (list, tuple)):
+#         # Case 1: (input1, input2, target) or (input_struct, target)
+#         if len(data_batch) == 3:
+#             cond, const, seq_real = data_batch
+#         elif len(data_batch) == 2:
+#             inputs, seq_real = data_batch
+            
+#     elif isinstance(data_batch, dict):
+#         # Case 2: Dictionary batch
+#         seq_real = data_batch.get('output', data_batch.get('hi_res_inputs'))
+#         inputs = {k: v for k, v in data_batch.items() if k not in ['output', 'hi_res_inputs']}
+#         if inputs:
+#             # Try to infer cond/const from remaining inputs
+#             if 'lo_res_inputs' in inputs:
+#                 cond = inputs['lo_res_inputs']
+#                 if 'const_inputs' in inputs:
+#                     const = inputs['const_inputs']
+#                 elif 'hi_res_inputs' in inputs:
+#                     const = inputs['hi_res_inputs']
+#                 else:
+#                     # Take the first remaining input as const if multiple exist
+#                     remaining_inputs = [v for k, v in inputs.items() if k != 'lo_res_inputs']
+#                     const = remaining_inputs[0] if remaining_inputs else None
+#             elif len(inputs) == 1:
+#                 # If only one input, assume it is 'cond'
+#                 cond = list(inputs.values())[0]
+#             elif len(inputs) >= 2:
+#                 # If multiple inputs, assume the first is 'cond' and the second is 'const'
+#                 cond = list(inputs.values())[0]
+#                 const = list(inputs.values())[1]
+
+
+#     # Post-process inputs from (inputs, seq_real) tuple if needed
+#     if inputs is not None and isinstance(inputs, (list, tuple)):
+#         cond = inputs[0]
+#         const = inputs[1] if len(inputs) > 1 else None
+#     elif inputs is not None and isinstance(inputs, dict):
+#         # This part handles the case where (inputs, seq_real) was passed and inputs was a dict
+#         if 'lo_res_inputs' in inputs: cond = inputs['lo_res_inputs']
+#         else: cond = list(inputs.values())[0] if inputs else None # Fallback
+
+#         if 'const_inputs' in inputs: const = inputs['const_inputs']
+#         elif 'hi_res_inputs' in inputs: const = inputs['hi_res_inputs'] 
+#         else: const = list(inputs.values())[1] if len(inputs) > 1 else None
+
+
+#     ## 🚩 Final Fallbacks and Check
+#     if cond is None or seq_real is None:
+#         raise ValueError("Error: impossible to get the condition ('cond') or real sequence ('seq_real') entries.")
+
+
+#     print(f"DEBUG PLOTS: Dimensions -> Cond: {cond.shape}, Const: {const.shape if const is not None else 'None'}, Seq_Real: {seq_real.shape}")
+
+#     # 4. Generation of the sequences
+#     batch_size = cond.shape[0]
+#     seq_gen = []
+    
+#     # Prepare the input list for the generator/decoder
+#     # The generator expects: gen.predict([cond, const, noise]) or gen.predict([cond, const])
+    
+#     if mode == 'GAN':
+#         for i in range(num_instances):
+#             noise_shape = cond[0, ..., 0].shape + (noise_channels,)
+#             # Ensure noise_gen() returns a tensor compatible with the batch size
+#             noise_gen = NoiseGenerator(noise_shape, batch_size=batch_size) 
+#             # Build input list dynamically: [cond, const, noise]
+#             inputs = [cond]
+#             if const is not None: inputs.append(const)
+#             inputs.append(noise_gen())
+            
+#             seq_gen.append(gen.predict(inputs))
+            
+#     elif mode == 'det':
+#         for i in range(num_instances):
+#             # Build input list dynamically: [cond, const]
+#             inputs = [cond]
+#             if const is not None: inputs.append(const)
+            
+#             seq_gen.append(gen.predict(inputs))
+            
+#     elif mode == 'VAEGAN':
+#         # Encoder requires: encoder([cond, const])
+#         encoder_inputs = [cond]
+#         if const is not None: encoder_inputs.append(const)
+#         (mean, logvar) = gen.encoder(encoder_inputs)
+        
+#         for i in range(num_instances):
+#             noise_shape = cond[0, ..., 0].shape + (latent_variables,)
+#             noise_gen = NoiseGenerator(noise_shape, batch_size=batch_size)
+            
+#             # Decoder requires: decoder.predict([mean, logvar, noise, const])
+#             decoder_inputs = [mean, logvar, noise_gen()]
+#             if const is not None: decoder_inputs.append(const)
+            
+#             seq_gen.append(gen.decoder.predict(decoder_inputs))
+
+#     # ----------------------------------------------------------------------
+#     # 5. DENORMALIZATION (CORRECTION)
+#     # ----------------------------------------------------------------------
+    
+#     # A. Determine normalization strategies
+#     #
+    
+#     # Target Variable: 'precipitation_cumulative_mean'
+#     target_var_name = 'precipitation_cumulative_mean'
+#     # Look up the strategy. If not found, use 'log' by default.
+#     try:
+#         # Note: data.VAR_LOOKUP_NGCM is assumed to be accessible
+#         target_norm_strat = data.VAR_LOOKUP_NGCM.get(target_var_name, {}).get('normalisation', 'log')
+#     except AttributeError:
+#         # If VAR_LOOKUP_NGCM is not accessible, hardcode the fallback
+#         print("WARNING: data.VAR_LOOKUP_NGCM not accessible. Using 'log' by default for the target.")
+#         target_norm_strat = 'log'
+
+#     # Input Variable (Cond): The plot displays channel 0. 
+#     # Based on 'all_ngcm_fields', index 0 is 'evaporation'.
+#     try:
+#         # Get the name and strategy for the variable in the first channel (index 0)
+#         input_var_name_ch0 = data.all_ngcm_fields[0] 
+#         input_norm_strat_ch0 = data.VAR_LOOKUP_NGCM.get(input_var_name_ch0, {}).get('normalisation', 'log')
+#     except (AttributeError, IndexError):
+#         print("WARNING: data.all_ngcm_fields not accessible. Using 'log' by default for input channel 0.")
+#         input_var_name_ch0 = "Channel 0 Input"
+#         input_norm_strat_ch0 = 'log'
+
+#     print(f"DEBUG PLOTS: Target Strategy ({target_var_name}): {target_norm_strat}")
+#     print(f"DEBUG PLOTS: Input Ch 0 Strategy ({input_var_name_ch0}): {input_norm_strat_ch0}")
+
+#     # B. Apply Denormalization
+#     # For seq_real and seq_gen (Precipitation) -> use target_norm_strat
+#     seq_real = data.denormalise(seq_real, normalisation_type=target_norm_strat)
+#     seq_gen = [data.denormalise(seq, normalisation_type=target_norm_strat) for seq in seq_gen]
+
+#     # For cond (Input) - CRITICAL CORRECTION
+#     # WARNING: 'cond' contains multiple channels with potentially different normalizations (log and minmax).
+#     # `data.denormalise` applies the strategy to the WHOLE tensor.
+#     # Applying 'log' to the entire 'cond' will corrupt non-'log' variables (e.g., wind/minmax).
+#     # HOWEVER, since 'plot_sequences' only displays channel 0 (which is 'evaporation/log'), 
+#     # it is only acceptable for *visualization* to denormalize the *displayed channel*.
+#     # A proper fix would require denormalizing *each channel individually* if they are all needed.
+    
+#     # FIX: Only denormalize the part of 'cond' that corresponds to the displayed channel's strategy.
+#     # For simplicity, we denormalize the whole tensor using the strategy of channel 0, 
+#     # but include a comment about the inherent limitation.
+    
+#     # We create a copy of 'cond' and only denormalize the first channel data using its strategy.
+#     # The rest of the channels will remain in their normalized state (or a placeholder value)
+#     # as they are not plotted.
+    
+#     cond_denorm_ch0 = np.copy(cond[:, :, :, 0:1]) # Take only channel 0
+#     cond_denorm_ch0 = data.denormalise(cond_denorm_ch0, normalisation_type=input_norm_strat_ch0)
+    
+#     # If cond has more than one channel, we'll use a mixed tensor for plotting convenience,
+#     # placing the denormalized Ch 0 back.
+#     if cond.shape[-1] > 1:
+#         # Create a blank array or use the original 'cond'
+#         cond_denorm = np.copy(cond) 
+#         cond_denorm[:, :, :, 0:1] = cond_denorm_ch0
+#     else:
+#         # If it's single-channel input, the denormalized channel is the whole thing
+#         cond_denorm = cond_denorm_ch0
+    
+#     # The variable 'cond' used later must be the one with the first channel denormalized.
+#     cond = cond_denorm
+    
+#     # ----------------------------------------------------------------------
+
+#     # 6. PLOTTING
+#     num_rows = actual_samples = min(num_samples, batch_size) # Ensure actual_samples is set
+#     num_cols = 2 + num_instances
+#     figsize = (num_cols*1.5, num_rows*1.5)
+#     plt.figure(figsize=figsize)
+
+#     gs = gridspec.GridSpec(num_rows, num_cols, wspace=0.05, hspace=0.05)
+    
+#     # Value range for plotting (e.g., 0 to 5 mm/h for rain, or 0 to 1 for evaporation)
+#     # You can adjust this or make it dynamic
+#     value_range = (0, 5) 
+    
+#     # Create titles for the columns
+#     column_titles = [f"Real Target ({target_var_name})", f"Input ({input_var_name_ch0})"] + [f"Prediction {k+1}" for k in range(num_instances)]
+
+#     for s in range(actual_samples):
+#         i = s
+        
+#         # Column 1: Target (Precipitation)
+#         plt.subplot(gs[i, 0])
+#         # seq_real can be (batch, h, w, 1) or (batch, h, w)
+#         # We ensure it's 2D for plotting
+#         real_data = seq_real[s, ..., 0] if seq_real.ndim == 4 else seq_real[s, :, :]
+#         plot_img(real_data, value_range=value_range)
+#         if i == 0: plt.title(column_titles[0], fontsize=8) # Title only for the first row
+        
+#         # Column 2: Input (Channel 0 -> Evaporation)
+#         plt.subplot(gs[i, 1])
+#         # cond can be (batch, h, w, N) or (batch, h, w)
+#         input_data = cond[s, ..., 0] if cond.ndim == 4 else cond[s, :, :]
+#         plot_img(input_data, value_range=value_range)
+#         if i == 0: plt.title(column_titles[1], fontsize=8)
+        
+#         # Subsequent Columns: Predictions
+#         for k in range(num_instances):
+#             j = 2 + k
+#             plt.subplot(gs[i, j])
+#             gen_data = seq_gen[k][s, ..., 0] if seq_gen[k].ndim == 4 else seq_gen[k][s, :, :]
+#             plot_img(gen_data, value_range=value_range)
+#             if i == 0: plt.title(column_titles[j], fontsize=8)
+
+#     plt.suptitle('Checkpoint ' + str(checkpoint), y=1.02) # Move title up for better fit
+
+#     if out_fn is not None:
+#         plt.savefig(out_fn + f"_{checkpoint}.pdf", bbox_inches='tight')
+#         plt.close()
+        
+#     print("DEBUG PLOTS: Save completed.")
+
+
+ ## 🚩 I used the previous code of plot_sequences It looks like my data_gen_valid is not well defined
 def plot_sequences(gen,
                    mode,
                    batch_gen,
@@ -420,56 +669,10 @@ def plot_sequences(gen,
                    num_instances=4,
                    out_fn=None):
 
-    print("\n--- DEBUG PLOTS: Enter in plot sequences ---")
+    for cond, const, seq_real in batch_gen.as_numpy_iterator():
+        batch_size = cond.shape[0]
 
-    # 1. GESTION ITERATEUR
-    if hasattr(batch_gen, 'as_numpy_iterator'):
-        iterator = batch_gen.as_numpy_iterator()
-    else:
-        iterator = iter(batch_gen)
-
-    # 2. RECUPERATION DU PREMIER BATCH
-    try:
-        data_batch = next(iterator)
-    except StopIteration:
-        print("DEBUG PLOTS: The generator is empty.")
-        return
-
-    # 3. EXTRACTION DES DONNEES
-    cond, const, seq_real = None, None, None
-
-    if len(data_batch) == 3:
-        cond, const, seq_real = data_batch
-    elif len(data_batch) == 2:
-        inputs, seq_real = data_batch
-        
-        if isinstance(inputs, dict):
-            # Récupération Inputs
-            if 'lo_res_inputs' in inputs: cond = inputs['lo_res_inputs']
-            else: cond = list(inputs.values())[0]
-
-            # Récupération Constantes
-            if 'const_inputs' in inputs: const = inputs['const_inputs']
-            elif 'hi_res_inputs' in inputs: const = inputs['hi_res_inputs'] 
-            else: const = list(inputs.values())[1] if len(inputs) > 1 else None
-
-        elif isinstance(inputs, (list, tuple)):
-            cond = inputs[0]
-            const = inputs[1]
-
-    # Fallback si target manquante
-    if seq_real is None and isinstance(data_batch, dict):
-        seq_real = data_batch.get('output', data_batch.get('hi_res_inputs'))
-
-    if cond is None:
-        raise ValueError("error .impossible to get the entries.")
-
-    print(f"DEBUG PLOTS: Dimensions -> Cond: {cond.shape}, Const: {const.shape if const is not None else 'None'}")
-
-    # 4. GENERATION DES PREDICTIONS
-    batch_size = cond.shape[0]
     seq_gen = []
-    
     if mode == 'GAN':
         for i in range(num_instances):
             noise_shape = cond[0, ..., 0].shape + (noise_channels,)
@@ -479,99 +682,46 @@ def plot_sequences(gen,
         for i in range(num_instances):
             seq_gen.append(gen.predict([cond, const]))
     elif mode == 'VAEGAN':
+        # call encoder
         (mean, logvar) = gen.encoder([cond, const])
+        # run decoder n times
         for i in range(num_instances):
             noise_shape = cond[0, ..., 0].shape + (latent_variables,)
             noise_gen = NoiseGenerator(noise_shape, batch_size=batch_size)
             seq_gen.append(gen.decoder.predict([mean, logvar, noise_gen(), const]))
 
-    # ----------------------------------------------------------------------
-    # 5. DENORMALISATION DYNAMIQUE (CORRECTION)
-    # ----------------------------------------------------------------------
-    
-    # A. Identifier les stratégies de normalisation
-    # On accède aux dictionnaires définis dans dsrnngan.data.data
-    
-    # Variable Cible (Target) : 'precipitation_cumulative_mean'
-    target_var_name = 'precipitation_cumulative_mean'
-    # On cherche la stratégie dans le lookup. Si pas trouvé, 'log' par défaut.
-    # Note: on utilise data.VAR_LOOKUP_NGCM car VAR_LOOKUP_NGCM est dans data.py
-    try:
-        target_norm_strat = data.VAR_LOOKUP_NGCM.get(target_var_name, {}).get('normalisation', 'log')
-    except AttributeError:
-        # Si VAR_LOOKUP_NGCM n'est pas accessible directement, on hardcode le fallback
-        print("WARNING: data.VAR_LOOKUP_NGCM non accessible. Utilisation de 'log' par défaut.")
-        target_norm_strat = 'log'
+    seq_real = data.denormalise(seq_real)
+    cond = data.denormalise(cond)
+    seq_gen = [data.denormalise(seq) for seq in seq_gen]
 
-    # Variable Input (Cond) : On affiche le canal 0. 
-    # D'après votre liste all_ngcm_fields, l'index 0 est 'evaporation'.
-    try:
-        input_var_name = data.all_ngcm_fields[0] # Devrait être 'evaporation'
-        input_norm_strat = data.VAR_LOOKUP_NGCM.get(input_var_name, {}).get('normalisation', 'log')
-    except (AttributeError, IndexError):
-        print("WARNING: data.all_ngcm_fields non accessible. Utilisation de 'log' par défaut pour l'input.")
-        input_norm_strat = 'log'
-
-    print(f"DEBUG PLOTS: Stratégie Target ({target_var_name}): {target_norm_strat}")
-    print(f"DEBUG PLOTS: Stratégie Input ({input_var_name}): {input_norm_strat}")
-
-    # B. Appliquer la dénormalisation
-    # Pour seq_real et seq_gen (Précipitation) -> on utilise target_norm_strat
-    seq_real = data.denormalise(seq_real, normalisation_type=target_norm_strat)
-    seq_gen = [data.denormalise(seq, normalisation_type=target_norm_strat) for seq in seq_gen]
-
-    # Pour cond (Input)
-    # ATTENTION : cond contient 11 canaux avec des normalisations différentes (log et minmax).
-    # data.denormalise applique la stratégie à TOUT le tenseur.
-    # Si on applique 'log' à tout cond, les vents (minmax) seront faussés.
-    # MAIS, comme plot_sequences n'affiche que le canal 0 (evaporation/log) plus bas, 
-    # c'est acceptable pour la visualisation de dénormaliser cond avec la stratégie du canal 0.
-    cond = data.denormalise(cond, normalisation_type=input_norm_strat)
-
-    # ----------------------------------------------------------------------
-
-    # 6. AFFICHAGE
     num_rows = num_samples
-    num_cols = 2 + num_instances
+    num_cols = 2+num_instances
+
     figsize = (num_cols*1.5, num_rows*1.5)
     plt.figure(figsize=figsize)
 
-    gs = gridspec.GridSpec(num_rows, num_cols, wspace=0.05, hspace=0.05)
-    
-    # Plage de valeurs (ex: 0 à 10 mm/h pour la pluie, ou 0 à 1 pour l'évap)
-    # Vous pouvez ajuster ceci ou le rendre dynamique
-    value_range = (0, 5) 
-    
-    actual_samples = min(num_samples, batch_size)
+    gs = gridspec.GridSpec(num_rows, num_cols,
+                           wspace=0.05, hspace=0.05)
 
-    for s in range(actual_samples):
+    value_range = (0, 5)  # batch_gen.decoder.value_range
+
+    for s in range(num_samples):
         i = s
-        
-        # Colonne 1 : Target (Précipitation)
-        # seq_real peut être (batch, h, w, 1) ou (batch, h, w)
         plt.subplot(gs[i, 0])
-        real_data = seq_real[s, :, :, 0] if seq_real.ndim == 4 else seq_real[s, :, :]
-        plot_img(real_data, value_range=value_range)
-        
-        # Colonne 2 : Input (Canal 0 -> Evaporation)
+        plot_img(seq_real[s, :, :, 0], value_range=value_range)
         plt.subplot(gs[i, 1])
-        input_data = cond[s, :, :, 0] if cond.ndim == 4 else cond[s, :, :]
-        plot_img(input_data, value_range=value_range)
-        
-        # Colonnes suivantes : Predictions
+        plot_img(cond[s, :, :, 0], value_range=value_range)
         for k in range(num_instances):
             j = 2+k
             plt.subplot(gs[i, j])
-            gen_data = seq_gen[k][s, :, :, 0] if seq_gen[k].ndim == 4 else seq_gen[k][s, :, :]
-            plot_img(gen_data, value_range=value_range)
+            plot_img(seq_gen[k][s, :, :, 0], value_range=value_range)
 
     plt.suptitle('Checkpoint ' + str(checkpoint))
 
     if out_fn is not None:
-        plt.savefig(out_fn+f"_{checkpoint}.pdf", bbox_inches='tight')
+        plt.savefig(out_fn, bbox_inches='tight')
         plt.close()
-        
-    print("DEBUG PLOTS: Sauvegarde terminée.")
+
    
     
 def plot_rank_histogram(ax, ranks, N_ranks=101, **plot_params):
