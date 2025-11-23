@@ -420,7 +420,7 @@ def plot_sequences(gen,
                    num_instances=4,
                    out_fn=None):
 
-    print("\n--- DEBUG PLOTS: Entrée dans plot_sequences ---")
+    print("\n--- DEBUG PLOTS: Enter in plot sequences ---")
 
     # 1. GESTION ITERATEUR
     if hasattr(batch_gen, 'as_numpy_iterator'):
@@ -432,7 +432,7 @@ def plot_sequences(gen,
     try:
         data_batch = next(iterator)
     except StopIteration:
-        print("DEBUG PLOTS: Le générateur est vide.")
+        print("DEBUG PLOTS: The generator is empty.")
         return
 
     # 3. EXTRACTION DES DONNEES
@@ -462,7 +462,7 @@ def plot_sequences(gen,
         seq_real = data_batch.get('output', data_batch.get('hi_res_inputs'))
 
     if cond is None:
-        raise ValueError("Erreur critique : Impossible de récupérer les données d'entrée (cond).")
+        raise ValueError("error .impossible to get the entries.")
 
     print(f"DEBUG PLOTS: Dimensions -> Cond: {cond.shape}, Const: {const.shape if const is not None else 'None'}")
 
@@ -572,7 +572,7 @@ def plot_sequences(gen,
         plt.close()
         
     print("DEBUG PLOTS: Sauvegarde terminée.")
-    print("DEBUG PLOTS: Plot terminé avec succès.\n")
+   
     
 def plot_rank_histogram(ax, ranks, N_ranks=101, **plot_params):
 
