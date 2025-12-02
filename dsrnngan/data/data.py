@@ -155,7 +155,7 @@ def denormalise(x, normalisation_type: str):
     """
     Undo normalisation
     """
-    # Si x est encore un dictionnaire par accident, on prend la première valeur
+    
     if isinstance(x, dict):
         x = list(x.values())[0]
 
@@ -164,14 +164,13 @@ def denormalise(x, normalisation_type: str):
     elif normalisation_type == 'sqrt':
         return np.power(x, 2)
     elif normalisation_type == 'minmax':
-        # Pour l'instant, on retourne tel quel car on n'a pas les bornes min/max ici.
-        # Cela évite le crash "NotImplementedError" pour les vents.
+        
         return x
     elif normalisation_type == 'standardise':
-        # Idem, on retourne tel quel
+        
         return x
     else:
-        # Pour éviter de bloquer l'exécution, on print une erreur mais on retourne x
+        
         print(f"Warning: normalisation type {normalisation_type} not recognised. Returning raw data.")
         return x
     

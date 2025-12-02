@@ -710,7 +710,7 @@ def plot_sequences(gen,
         plt.subplot(gs[i, 0])
         plot_img(seq_real[s, :, :, 0], value_range=value_range)
         plt.subplot(gs[i, 1])
-        plot_img(cond[s, :, :, 0], value_range=value_range)
+        plot_img(cond[s, :, :, 1], value_range=value_range)
         for k in range(num_instances):
             j = 2+k
             plt.subplot(gs[i, j])
@@ -719,7 +719,8 @@ def plot_sequences(gen,
     plt.suptitle('Checkpoint ' + str(checkpoint))
 
     if out_fn is not None:
-        plt.savefig(out_fn, bbox_inches='tight')
+        # plt.savefig(out_fn, bbox_inches='tight')
+        plt.savefig(out_fn + f"_{checkpoint}.pdf", bbox_inches='tight')
         plt.close()
 
    

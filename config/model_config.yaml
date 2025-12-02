@@ -26,7 +26,7 @@ train:
 
     training_weights: [0.25, 0.25, 0.25, 0.25]
     num_epochs: 5
-    steps_per_checkpoint:  2000
+    steps_per_checkpoint:  10
     batch_size: 2  # can use 400x16 without CL, or 3200x2 with CL
     kl_weight: 1e-8  # used for VAEGAN
     ensemble_size: 8  # size of pred ensemble for content loss
@@ -34,7 +34,7 @@ train:
     content_loss_weight: 1000.0 #for  ensemble mean MSE and 100 for CRPS
     # img_chunk_width: None
     img_chunk_width: 256
-    num_samples: 40000
+    num_samples: 100
     
 
 val:
