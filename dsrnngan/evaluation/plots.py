@@ -22,6 +22,7 @@ from dsrnngan.utils import read_config
 data_config = read_config.read_data_config()
 DATA_PATHS = read_config.get_data_paths()
 NGCM_NORMALISATION_STRATEGY = data_config.ngcm_input_normalisation_strategy
+Output_NORMALISATION_STRATEGY = data_config.output_normalisation 
 
 
 # See https://matplotlib.org/stable/gallery/color/named_colors.html for edge colour options
