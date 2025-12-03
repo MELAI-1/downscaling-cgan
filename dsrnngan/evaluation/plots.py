@@ -16,6 +16,7 @@ from metpy import plots as metpy_plots
 import cartopy.feature as cfeature
 from cartopy.feature import NaturalEarthFeature, auto_scaler, AdaptiveScaler
 from shapely.geometry import Polygon, LineString
+import numpy as np
 
 from dsrnngan.utils import read_config
 
@@ -413,6 +414,8 @@ def truncate_colourmap(cmap, minval=0.0, maxval=1.0, n=100):
 
 
  ## 🚩 I used the previous code of plot_sequences It looks like my data_gen_valid is not well defined
+import numpy as np  # Required for np.stack
+
 def plot_sequences(gen,
                    mode,
                    batch_gen,
@@ -465,12 +468,23 @@ def plot_sequences(gen,
     # Denormalize seq_real (Output) using the OUTPUT strategy.
     seq_real = data.denormalise(seq_real, normalisation_type=OUTPUT_NORMALISATION_STRATEGY)
     
-    # Denormalize cond (Input) using the generated list of 11 strategies.
-    cond = data.denormalise(cond, normalisation_type=NGCM_STRATEGIES_PER_CHANNEL)
+    # NEW FIX: Denormalize cond (Input) channel-by-channel.
+    denormalized_channels = []
+    for i, strategy in enumerate(NGCM_STRATEGIES_PER_CHANNEL):
+        # Denormalize the i-th channel of the cond tensor
+        channel_data = cond[..., i] 
+        denorm_data = data.denormalise(channel_data, normalisation_type=strategy)
+        denormalized_channels.append(denorm_data)
+
+    # Re-stack the denormalized channels to form the final 'cond' tensor
+    cond = np.stack(denormalized_channels, axis=-1)
     
     # Denormalize seq_gen (Output) using the OUTPUT strategy.
     seq_gen = [data.denormalise(seq, normalisation_type=OUTPUT_NORMALISATION_STRATEGY) for seq in seq_gen]
 
+    # NEW FIX: Limit num_samples to the available batch_size (solves IndexError).
+    num_samples = min(num_samples, batch_size) 
+    
     num_rows = num_samples
     num_cols = 2 + num_instances
 
@@ -485,12 +499,16 @@ def plot_sequences(gen,
     for s in range(num_samples):
         i = s
         plt.subplot(gs[i, 0])
+        # FIX: Removed the incorrect channel index [:, :, 0] for the 3D array
         plot_img(seq_real[s, :, :], value_range=value_range)
+        
         plt.subplot(gs[i, 1])
         plot_img(cond[s, :, :, 1], value_range=value_range)
+        
         for k in range(num_instances):
             j = 2 + k
             plt.subplot(gs[i, j])
+            # FIX: Removed the incorrect channel index [:, :, 0] for the 3D array
             plot_img(seq_gen[k][s, :, :], value_range=value_range)
 
     plt.suptitle('Checkpoint ' + str(checkpoint))
@@ -498,8 +516,7 @@ def plot_sequences(gen,
     if out_fn is not None:
         # plt.savefig(out_fn, bbox_inches='tight')
         plt.savefig(out_fn + f"_{checkpoint}.pdf", bbox_inches='tight')
-        plt.close()
-    
+        plt.close()    
 def plot_rank_histogram(ax, ranks, N_ranks=101, **plot_params):
 
     bc = np.linspace(0, 1, N_ranks)
