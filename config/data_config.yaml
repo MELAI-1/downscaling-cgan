@@ -2,7 +2,7 @@ data_paths: "BLUE_PEBBLE"  # Choose which paths version to use in PATHS
 fcst_data_source: "ngcm"
 obs_data_source: "imerg"
 normalisation_year: 2018
-num_samples: 100
+num_samples: 40000
 normalise_inputs: True
 output_normalisation: "log"
 num_classes: 4
