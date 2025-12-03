@@ -279,8 +279,82 @@ class QuantileMapper():
         return self.quantiles_by_area
        
         
-    def get_quantile_mapped_forecast(self, fcst: np.ndarray, dates: Iterable, hours: Iterable=None):
+    # def get_quantile_mapped_forecast(self, fcst: np.ndarray, dates: Iterable, hours: Iterable=None):
 
+    #     # Find indexes of dates in test set relative to the date chunks
+        
+    #     fcst = fcst.copy()
+
+    #     if hours is not None:
+    #         date_hour_list = list(set(zip(dates,hours)))
+    #     else:
+    #         date_hour_list = list(set(zip(dates,[0]*len(dates))))
+
+    #     test_date_chunks =  {'_'.join([str(month_range[0]), str(month_range[-1])]): [item for item in date_hour_list if item[0].month in month_range] for month_range in self.month_ranges}
+    #     test_date_indexes = {k : [date_hour_list.index(item) for item in chunk] for k, chunk in test_date_chunks.items()}
+        
+    #     (_, lat_dim, lon_dim) = fcst.shape
+        
+    #     fcst_corrected = np.empty(fcst.shape)
+    #     fcst_corrected[:,:,:] = np.nan
+
+    #     for date_index_name, d_ix in test_date_indexes.items():
+            
+    #         quantiles_for_time_period = self.quantiles_by_area[f't{date_index_name}']
+            
+            
+    #         weighted_fcst_quantiles = np.empty([len(self.quantile_locs)] + list(fcst.shape[1:]))
+    #         weighted_fcst_quantiles[...] = np.nan
+
+    #         weighted_obs_quantiles = np.empty([len(self.quantile_locs)] + list(fcst.shape[1:]))
+    #         weighted_obs_quantiles[...] = np.nan
+
+    #         lon_chunk_size = list(self.quantile_longitude_groupings.values())[0]['lon_index_range'][-1]
+    #         lat_chunk_size = list(self.quantile_latitude_groupings.values())[0]['lat_index_range'][-1]
+    #         filter_size = np.mean([lon_chunk_size, lat_chunk_size])
+
+    #         # Create smoothed quantiles (i.e. averaging quantiles over a neighbourhood centred at each pixel)
+    #         for q_pos in range(len(self.quantile_locs)):
+                
+    #             weighted_fcst_quantiles[q_pos, ...] = uniform_filter(quantiles_for_time_period['fcst_quantiles'][q_pos, ...], size=filter_size, mode='reflect')
+    #             weighted_obs_quantiles[q_pos, ...] = uniform_filter(quantiles_for_time_period['obs_quantiles'][q_pos, ...], size=filter_size, mode='reflect')
+
+    #         # TODO: Use apply_along_axis to speed this up
+    #         # Use smoothed quantiles to transform forecast values
+    #         for lat_index in range(lat_dim):
+    #             for lon_index in range(lon_dim):
+                
+    #                 obs_quantiles, fcst_quantiles = weighted_obs_quantiles[:,lat_index, lon_index], weighted_fcst_quantiles[:,lat_index, lon_index]
+
+    #                 tmp_fcst_array = fcst[d_ix, lat_index, lon_index].copy()
+                    
+    #                 # Note that np.interp clips any values greater than max(fcst_quantiles)
+    #                 tmp_fcst_array = np.interp(tmp_fcst_array, fcst_quantiles, obs_quantiles)
+     
+    #                 # Deal with zeros; assign random bin
+    #                 ifs_zero_quantiles = [n for n, q in enumerate(fcst_quantiles) if q == 0.0]
+    #                 if ifs_zero_quantiles:
+    #                     zero_inds = np.argwhere(tmp_fcst_array == 0.0)
+                        
+    #                     if len(zero_inds) > 0:
+    #                         tmp_fcst_array[zero_inds] = np.array(obs_quantiles)[np.random.choice(ifs_zero_quantiles, size=zero_inds.shape)]
+                    
+    #                 # Deal with values outside the training range
+    #                 max_training_forecast_val = np.max(fcst_quantiles)
+    #                 max_obs_forecast_val = np.max(obs_quantiles)
+    #                 extreme_inds = np.argwhere(fcst[d_ix, lat_index, lon_index]  > max_training_forecast_val)
+                    
+    #                 if len(extreme_inds) > 0:
+    #                     uplift = max_obs_forecast_val - max_training_forecast_val
+    #                     tmp_fcst_array[extreme_inds] = fcst[d_ix, lat_index, lon_index][extreme_inds] + uplift
+                    
+    #                 fcst_corrected[d_ix,lat_index,lon_index] = tmp_fcst_array
+
+    #     return fcst_corrected
+def get_quantile_mapped_forecast(self, fcst: np.ndarray, dates: Iterable, hours: Iterable=None):
+        
+        # NOTE: Assurez-vous que 'numpy' est importé comme 'np' dans ce module.
+        
         # Find indexes of dates in test set relative to the date chunks
         
         fcst = fcst.copy()
@@ -309,6 +383,9 @@ class QuantileMapper():
             weighted_obs_quantiles = np.empty([len(self.quantile_locs)] + list(fcst.shape[1:]))
             weighted_obs_quantiles[...] = np.nan
 
+            # Assuming uniform_filter is imported from scipy.ndimage
+            from scipy.ndimage import uniform_filter 
+
             lon_chunk_size = list(self.quantile_longitude_groupings.values())[0]['lon_index_range'][-1]
             lat_chunk_size = list(self.quantile_latitude_groupings.values())[0]['lat_index_range'][-1]
             filter_size = np.mean([lon_chunk_size, lat_chunk_size])
@@ -316,8 +393,36 @@ class QuantileMapper():
             # Create smoothed quantiles (i.e. averaging quantiles over a neighbourhood centred at each pixel)
             for q_pos in range(len(self.quantile_locs)):
                 
-                weighted_fcst_quantiles[q_pos, ...] = uniform_filter(quantiles_for_time_period['fcst_quantiles'][q_pos, ...], size=filter_size, mode='reflect')
-                weighted_obs_quantiles[q_pos, ...] = uniform_filter(quantiles_for_time_period['obs_quantiles'][q_pos, ...], size=filter_size, mode='reflect')
+                # Apply filter to forecast quantiles
+                filtered_fcst = uniform_filter(
+                    quantiles_for_time_period['fcst_quantiles'][q_pos, ...], 
+                    size=filter_size, 
+                    mode='reflect'
+                )
+                
+                # Apply filter to observation quantiles
+                filtered_obs = uniform_filter(
+                    quantiles_for_time_period['obs_quantiles'][q_pos, ...], 
+                    size=filter_size, 
+                    mode='reflect'
+                )
+                
+                # --- FIX FOR ValueError: could not broadcast input array (378,358) into (384,352) ---
+                # 1. Get the actual shape of the filtered output
+                H, W = filtered_fcst.shape
+                
+                # 2. Calculate the centered slice indices to match the filtered array's shape
+                # The assumption is that the filtered output is a centered crop of the full domain.
+                # fcst.shape[1] is 384, fcst.shape[2] is 352
+                h_start = (fcst.shape[1] - H) // 2
+                h_end = h_start + H
+                w_start = (fcst.shape[2] - W) // 2
+                w_end = w_start + W
+                
+                # 3. Assign the filtered output to the calculated centered slice.
+                weighted_fcst_quantiles[q_pos, h_start:h_end, w_start:w_end] = filtered_fcst
+                weighted_obs_quantiles[q_pos, h_start:h_end, w_start:w_end] = filtered_obs
+
 
             # TODO: Use apply_along_axis to speed this up
             # Use smoothed quantiles to transform forecast values
