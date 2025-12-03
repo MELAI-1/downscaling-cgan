@@ -485,13 +485,13 @@ def plot_sequences(gen,
     for s in range(num_samples):
         i = s
         plt.subplot(gs[i, 0])
-        plot_img(seq_real[s, :, :, 0], value_range=value_range)
+        plot_img(seq_real[s, :, :], value_range=value_range)
         plt.subplot(gs[i, 1])
         plot_img(cond[s, :, :, 1], value_range=value_range)
         for k in range(num_instances):
             j = 2 + k
             plt.subplot(gs[i, j])
-            plot_img(seq_gen[k][s, :, :, 0], value_range=value_range)
+            plot_img(seq_gen[k][s, :, :], value_range=value_range)
 
     plt.suptitle('Checkpoint ' + str(checkpoint))
 
