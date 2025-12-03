@@ -669,9 +669,23 @@ def plot_sequences(gen,
                    num_instances=4,
                    out_fn=None):
 
-    for cond, const, seq_real in batch_gen:
+    # MODIFIED BLOCK FOR PEP 8 AND ERROR FIX:
+    # The generator returns two dictionaries: (inputs_dict, outputs_dict).
+    # We unpack these two dictionaries first to avoid "expected 3, got 2" error.
+    for inputs_dict, outputs_dict in batch_gen:
+
+        # Extract the three required tensors (cond, const, seq_real) from the dictionaries
+        # using the keys defined in the DataGenerator's return.
+        cond = inputs_dict["lo_res_inputs"]
+        const = inputs_dict["hi_res_inputs"]
+        seq_real = outputs_dict["output"]
+
+        # The rest of the original loop body
         print(f"cond shape: {cond.shape}, const shape: {const.shape}, seq_real shape: {seq_real.shape}")
         batch_size = cond.shape[0]
+
+        # Break to ensure we only process the first batch for plotting samples.
+        break
 
     seq_gen = []
     if mode == 'GAN':
@@ -696,9 +710,10 @@ def plot_sequences(gen,
     seq_gen = [data.denormalise(seq) for seq in seq_gen]
 
     num_rows = num_samples
-    num_cols = 2+num_instances
+    num_cols = 2 + num_instances  # Added spaces around '+' for PEP 8
 
-    figsize = (num_cols*1.5, num_rows*1.5)
+    # Added spaces around '*' for PEP 8
+    figsize = (num_cols * 1.5, num_rows * 1.5)
     plt.figure(figsize=figsize)
 
     gs = gridspec.GridSpec(num_rows, num_cols,
@@ -713,7 +728,7 @@ def plot_sequences(gen,
         plt.subplot(gs[i, 1])
         plot_img(cond[s, :, :, 1], value_range=value_range)
         for k in range(num_instances):
-            j = 2+k
+            j = 2 + k  # Added spaces around '+' for PEP 8
             plt.subplot(gs[i, j])
             plot_img(seq_gen[k][s, :, :, 0], value_range=value_range)
 
@@ -722,9 +737,7 @@ def plot_sequences(gen,
     if out_fn is not None:
         # plt.savefig(out_fn, bbox_inches='tight')
         plt.savefig(out_fn + f"_{checkpoint}.pdf", bbox_inches='tight')
-        plt.close()
-
-   
+        plt.close()   
     
 def plot_rank_histogram(ax, ranks, N_ranks=101, **plot_params):
 
