@@ -122,7 +122,11 @@ quantile_data_dicts = {'test': {
 
 # NOTE:This requires data collection for the model 
 
-fps = [os.path.join(base_folder, 'n4_2-2_46aff_e2')]
+# 1. Use glob to find all paths within base_folder that match the 'n*' pattern.
+all_n_paths = glob.glob(os.path.join(base_folder, 'n*'))
+
+# 2. Assign fps a list containing the first found path, or an empty list if none were found.
+fps = [all_n_paths[0]] if all_n_paths else []
 
 imerg_training_data = []
 cgan_training_data = []
