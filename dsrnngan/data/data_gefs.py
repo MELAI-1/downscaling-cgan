@@ -1,0 +1,1404 @@
+""" Functions for handling data loading and saving. """
+from genericpath import isfile
+import os
+import re
+import pickle
+import logging
+import netCDF4
+from calendar import monthrange
+from tqdm import tqdm
+from glob import glob
+from typing import Iterable
+import gcsfs
+
+from datetime import datetime, timedelta, date
+import numpy as np
+import pandas as pd
+import xarray as xr
+import xesmf as xe
+from argparse import ArgumentParser
+import h5py
+import sys
+sys.path.insert(1, "../")
+
+logger = logging.getLogger(__file__)
+logger.setLevel(logging.INFO)
+
+from dsrnngan.utils import read_config
+
+data_config = read_config.read_data_config()
+DATA_PATHS = read_config.get_data_paths()
+
+
+##🚩 Path to the data 
+IMERG_PATH = DATA_PATHS["GENERAL"].get("IMERG", '')
+ERA5_PATH = DATA_PATHS["GENERAL"].get("ERA5", '')
+OROGRAPHY_PATH = DATA_PATHS["GENERAL"].get("OROGRAPHY")
+LSM_PATH = DATA_PATHS["GENERAL"].get("LSM")
+CONSTANTS_PATH = DATA_PATHS["GENERAL"].get("CONSTANTS")
+NGCM_PATH = DATA_PATHS["GENERAL"].get("NGCM", '')
+STATS_PATH = DATA_PATHS["GENERAL"].get("STATS", '')
+
+                    
+##🚩Add field_to_header_lookup_ngcm
+
+FIELD_TO_HEADER_LOOKUP_NGCM = {
+    'evaporation': 'sfc',
+    'precipitation_cumulative_mean': 'sfc',
+    'specific_cloud_ice_water_content': 'atmos',    
+    'u_component_of_wind': 'winds',
+    'v_component_of_wind': 'winds'
+}
+
+
+
+##🚩NGCM fields
+all_ngcm_fields=['evaporation',  'precipitation_cumulative_mean', 'specific_cloud_ice_water_content_500','specific_cloud_ice_water_content_700', 'specific_cloud_ice_water_content_850', 'u_component_of_wind_500','u_component_of_wind_700','u_component_of_wind_850', 'v_component_of_wind_500','v_component_of_wind_700','v_component_of_wind_850']
+nonnegative_fields= ['precipitation_cumulative_mean', 'specific_cloud_ice_water_content_500','specific_cloud_ice_water_content_700', 'specific_cloud_ice_water_content_850']
+
+HOURS=6
+
+input_fields = data_config.input_fields
+constant_fields = data_config.constant_fields
+all_fcst_hours = np.array([0, 6, 12, 18])
+
+# TODO: change this to behave like the IFS data load (to allow other vals of v, u etc)
+# TODO: move to a config
+VAR_LOOKUP_ERA5 = {'tp': {'folder': 'total_precipitation', 'suffix': 'day',
+                               'negative_vals': False},
+                        'q': {'folder': 'shum', 'subfolder': 'shum700', 'suffix': 'day_1deg',
+                              'normalisation': 'standardise', 'negative_vals': False},
+                        't': {'folder': 'ta', 'subfolder': 'tas700', 'suffix': 'day_1deg',
+                              'normalisation': 'minmax', 'negative_vals': False},
+                        'u': {'folder': 'u', 'subfolder': 'u700', 'suffix': 'day_1deg',
+                              'normalisation': 'minmax'},
+                        'v': {'folder': 'v', 'subfolder': 'v700', 'suffix': 'day_1deg',
+                              'normalisation': 'minmax'}}
+
+IFS_NORMALISATION_STRATEGY = data_config.input_normalisation_strategy
+
+##🚩NGCM NORMALISATION STRATEGY
+NGCM_NORMALISATION_STRATEGY = data_config.ngcm_input_normalisation_strategy
+
+
+# ##🚩NGCM Var lookup
+# VAR_LOOKUP_NGCM = {field: NGCM_NORMALISATION_STRATEGY[re.sub(r'([a-z_]+)[0-9]+', r'\1', field).rstrip('_')] 
+#                    for field in all_ngcm_fields}
+VAR_LOOKUP_NGCM = {field: NGCM_NORMALISATION_STRATEGY[field] 
+                   for field in all_ngcm_fields}
+
+
+all_era5_fields = list(VAR_LOOKUP_ERA5.keys())
+
+##🚩all ngcm fields
+all_ngcm_fields = list(VAR_LOOKUP_NGCM.keys())
+
+##🚩Add ngcm fields 
+input_field_lookup = { 'era5': all_era5_fields,'ngcm': all_ngcm_fields}
+
+NORMALISATION_YEAR = data_config.normalisation_year
+
+##🚩Define the default coordinates
+DEFAULT_LATITUDE_RANGE=np.arange(data_config.min_latitude, data_config.max_latitude + data_config.latitude_step_size, data_config.latitude_step_size)
+DEFAULT_LONGITUDE_RANGE=np.arange(data_config.min_longitude, data_config.max_longitude + data_config.longitude_step_size, data_config.longitude_step_size)
+
+char_integer_re = re.compile(r'[a-zA-Z]*([0-9]+)')
+
+
+##🚩 question: please I saw you did cap at 100 what is the impact ? 
+##🚩deormalise 
+def denormalise(x, normalisation_type: str):
+    """
+    Undo normalisation
+    """
+    
+    if isinstance(x, dict):
+        x = list(x.values())[0]
+
+    if normalisation_type == 'log':
+        return 10 ** x - 1
+    elif normalisation_type == 'sqrt':
+        return np.power(x, 2)
+    elif normalisation_type == 'minmax':
+        
+        return x
+    elif normalisation_type == 'standardise':
+        
+        return x
+    else:
+        
+        print(f"Warning: normalisation type {normalisation_type} not recognised. Returning raw data.")
+        return x
+ 
+def log_plus_1(data_array: xr.DataArray):
+    """
+    Transform data according to x -> log10(1 + x)
+
+    Args:
+        data_array (xr.DataArray): Data array to transform
+
+    Returns:
+        xr.DataArray: Transformed data array
+    """
+    return np.log10(1 + data_array)
+
+def infer_lat_lon_names(ds: xr.Dataset):
+    """
+    Infer names of latitude / longitude coordinates from the dataset
+
+    Args:
+        ds (xr.Dataset): dataset (containing one latitude coordinate 
+        and one longitude coordinate)
+
+    Returns:
+        tuple: (lat name, lon name)
+    """
+    
+    coord_names = list(ds.coords)
+    lat_var_name = [item for item in coord_names if item.startswith('lat')]
+    lon_var_name = [item for item in coord_names if item.startswith('lon')]
+    
+    assert (len(lat_var_name) == 1) and (len(lon_var_name) == 1), IndexError('Cannot infer latitude and longitude names from this dataset')
+
+    return lat_var_name[0], lon_var_name[0]
+
+def order_coordinates(ds: xr.Dataset):
+    """
+    Order coordinates of dataset -> (time, lat, lon)
+
+    Args:
+        ds (xr.Dataset): Dataset to order coordinates of
+
+    Returns:
+        xr.Dataset: Ordered dataset
+    """
+    
+    lat_var_name, lon_var_name = infer_lat_lon_names(ds)
+    
+    if 'time' in list(ds.dims):
+        return ds.transpose('time', lat_var_name, lon_var_name)
+    else:
+        return ds.transpose(lat_var_name, lon_var_name)
+
+def make_dataset_consistent(ds: xr.Dataset):
+    """
+    Ensure longitude and latitude are ordered in ascending order
+
+    Args:
+        ds (xr.Dataset): dataset
+
+    Returns:
+        xr.Dataset: Dataset with data reordered
+    """
+    
+    latitude_var, longitude_var = infer_lat_lon_names(ds)
+    ds = ds.sortby(latitude_var, ascending=True)
+    ds = ds.sortby(longitude_var, ascending=True)
+    
+    return ds
+
+def get_obs_dates(date_range: list,  hour: int, obs_data_source: str, 
+                  dataall_ngcmths=DATA_PATHS,
+                  ):
+    """
+    Get dates for which there is observational data available
+    Args:
+        date_range (list): list of candidate dates
+        obs_data_source (str): Name of data source
+        data_paths (dict, optional): Dict containing data paths. Defaults to DATA_PATHS.
+
+    Returns:
+        list: list of dates
+    """
+
+    obs_dates = set([item for item in date_range if file_exists(data_source=obs_data_source, year=item.year,
+                                                    month=item.month, day=item.day,
+                                                    data_paths=data_paths, hour=hour)])
+    
+    return sorted(obs_dates)
+
+
+##🚩this fuction is used to get the dates for which there is observational and forecast data available
+def get_dates(years, obs_data_source: str, 
+              fcst_data_source: str,
+              data_paths=DATA_PATHS):
+    """
+    Get dates for which there is observational and forecast data
+
+    Args:
+        years (int or list): list of years, or single integer year
+        obs_data_source (str): name of observational data source
+        fcst_data_source (str): name of forecast data source
+        data_paths (dict, optional): Dict containing paths to data. Defaults to DATA_PATHS.
+
+    Returns:
+        list: list of valid date strings
+    """
+    if isinstance(years, int):
+        years = [years]
+
+    years = sorted(years)
+    
+    date_range = pd.date_range(start=date(years[0], 1, 1), end=date(years[-1], 12, 31))
+    date_range = [item.date() for item in date_range]
+    
+    obs_dates = set([item for item in date_range if file_exists(data_source=obs_data_source, year=item.year,
+                                                    month=item.month, day=item.day,
+                                                    data_paths=data_paths)])
+##🚩Get forecast dates
+    fcst_dates = set([item for item in date_range if file_exists(data_source=fcst_data_source, year=item.year,
+                                                    month=item.month, day=item.day,
+                                                    data_paths=data_paths)])
+    dates = sorted(obs_dates.intersection(fcst_dates))
+        
+    return [item.strftime('%Y%m%d') for item in dates]
+
+##🚩 add the code for ngcm 
+
+
+def file_exists(data_source: str, year: int, month: int, day: int, hour='random', data_paths=None):
+    from datetime import datetime
+    import os
+
+    if data_paths is None:
+        raise ValueError("data_paths must be provided")
+    if hour == 'random':
+        hour = 0
+
+    # 🔹 NGCM
+    if data_source.lower() == 'ngcm':
+        fcst_dir = data_paths['GENERAL'].get('NGCM')
+        for field in data_paths.get('NGCM', {}).keys():
+            fp = get_ngcm_filepath(field, loaddate=datetime(year, month, day), loadtime=hour, fcst_dir=fcst_dir)
+            print(fp)  # Debugging line to print the filepath being checked
+            if os.path.isfile(fp):
+                return True
+        return False
+
+    # 🔹 IMERG
+    elif data_source.lower() == 'imerg':
+        imerg_dir = data_paths['GENERAL']['IMERG']
+        year_dir = os.path.join(imerg_dir, str(year))
+        filename = f"{year}{month:02d}{day:02d}_{hour:02d}.nc"
+        full_path = os.path.join(year_dir, filename)
+        return os.path.isfile(full_path)
+
+    else:
+        raise ValueError(f"Data source {data_source} not implemented in file_exists")
+
+                
+def filter_by_lat_lon(ds: xr.Dataset, 
+                      lon_range: list, 
+                      lat_range: list):
+    """
+    Filter dataset by latitude / longitude range
+
+    Args:
+        ds (xr.Dataset): Dataset to filter
+        lon_range (list): min and max longitude values
+        lat_range (list): min and max latitude values
+        lon_var_name (str, optional): Name of longitude variable in dataset. Defaults to 'lon'.
+        lat_var_name (str, optional): Name of latitude variable in dataset. Defaults to 'lat'.
+
+    Returns:
+        xr.Dataset: Filtered dataset
+    """
+    lat_var_name, lon_var_name = infer_lat_lon_names(ds)
+    
+    all_lat_vals = ds[lat_var_name].values
+    all_lon_vals = ds[lon_var_name].values
+    
+    overlapping_lat_vals = all_lat_vals[all_lat_vals >= min(lat_range)]
+    overlapping_lat_vals = overlapping_lat_vals[overlapping_lat_vals <= max(lat_range)]
+    
+    overlapping_lon_vals = all_lon_vals[all_lon_vals >= min(lon_range)]
+    overlapping_lon_vals = overlapping_lon_vals[overlapping_lon_vals <= max(lon_range)]
+        
+    ds = ds.sel({lat_var_name: overlapping_lat_vals})
+    ds = ds.sel({lon_var_name: overlapping_lon_vals})
+   
+    return ds
+
+
+def interpolate_dataset_on_lat_lon(ds: xr.Dataset, 
+                                   latitude_vals: list, 
+                                   longitude_vals: list,
+                                   interp_method:str ='bilinear'):
+    """
+    Interpolate dataset to new lat/lon values
+
+    Args:
+        ds (xr.Dataset): Datast to interpolate
+        latitude_vals (list): list of latitude values to interpolate to
+        longitude_vals (list): list of longitude values to interpolate to
+        interp_method (str, optional): name of interpolation method. Defaults to 'bilinear'._
+
+    Returns:
+        xr,Dataset: interpolated dataset
+    """
+    
+    lat_var_name, lon_var_name = infer_lat_lon_names(ds)
+    
+    min_lat = min(latitude_vals)
+    max_lat = max(latitude_vals)
+
+    min_lon = min(longitude_vals)
+    max_lon = max(longitude_vals)
+    
+    existing_latitude_vals = ds[lat_var_name].values
+    existing_longitude_vals = ds[lon_var_name].values
+    
+    if all([item in existing_latitude_vals for item in latitude_vals]) and all([item in existing_longitude_vals for item in longitude_vals]):
+        ds = ds.sel({lat_var_name: latitude_vals}).sel({lon_var_name: longitude_vals})
+        return ds
+    
+    # Filter to correct lat/lon range (faster this way)
+    # Add a buffer around it for interpolation
+    ds = filter_by_lat_lon(ds, [min_lon - 2, max_lon+2], [min_lat - 2, max_lat +2])
+
+    # check enough data to interpolate
+    min_actual_lat = min(ds.coords[lat_var_name].values)
+    max_actual_lat = max(ds.coords[lat_var_name].values)
+    min_actual_lon = min(ds.coords[lon_var_name].values)
+    max_actual_lon = max(ds.coords[lon_var_name].values)
+
+    print(f'Actual lat range: {min_actual_lat} to {max_actual_lat}')
+    print(f'Actual lon range: {min_actual_lon} to {max_actual_lon}')
+    print(f'Required lat range: {min_lat} to {max_lat}')
+    print(f'Required lon range: {min_lon} to {max_lon}')
+    # if not ((min_actual_lat < min_lat < max_actual_lat) and (min_actual_lon < min_lon < max_actual_lon)
+    #         and (min_actual_lat < max_lat < max_actual_lat) and (min_actual_lon < max_lon < max_actual_lon)):
+    #     raise ValueError('Larger buffer area needed to ensure good interpolation')
+
+    ds_out = xr.Dataset(
+        {
+            lat_var_name: ([lat_var_name], np.arange(-13.65,24.65+0.1,0.1)),
+            lon_var_name: ([lon_var_name], np.arange(19.15,54.25+0.1,0.1)), ##🚩 include it directly in the code but the best way will be to put the parameter in the data_config
+        }
+    )
+
+    # Use conservative to preserve global precipitation
+    regridder = xe.Regridder(ds, ds_out, interp_method)
+    regridded_ds = ds.copy()
+    
+    # Make float vars C-contiguous (to avoid warning message and potentially improve performance)
+    for var in list(regridded_ds.data_vars):
+        if regridded_ds[var].values.dtype.kind == 'f':
+            regridded_ds[var].values = np.ascontiguousarray(regridded_ds[var].values)
+            
+    regridded_ds = regridder(regridded_ds)
+
+    return regridded_ds
+
+def normalise_precipitation(data_array: xr.DataArray,
+                            normalisation_type: str):
+    
+    if normalisation_type == 'log':
+        return np.log10(1 + data_array)
+    elif normalisation_type == 'sqrt':
+        return np.sqrt(data_array)
+    else:
+        raise NotImplementedError(f'normalisation type {normalisation_type} not recognised')
+
+
+##🚩 we needd to update the stat_dict
+def preprocess(variable: str, 
+               ds: xr.Dataset, 
+               normalisation_strategy: dict, 
+               stats_dict: dict=None):
+    """
+    Preprocess data
+
+    Args:
+        variable (str): name of variable.
+        ds (xr.Dataset): dataset containing data for named variable
+        normalisation_strategy (dict): dict containing normalisation strategy for each variable
+        stats_dict (dict, optional): dict of values required for normalisation. Defaults to None.
+
+    Returns:
+        xr.Dataset: processed dataset
+    """
+    
+    
+    var_name = list(ds.data_vars)[0]
+
+    normalisation_type = normalisation_strategy[variable].get('normalisation')
+
+    if normalisation_type:
+
+        if normalisation_type == 'standardise':
+            ds[var_name] = (ds[var_name] - stats_dict[variable]['mean']) / stats_dict[variable]['std']
+
+        elif normalisation_type == 'minmax':
+            ds[var_name] = (ds[var_name] - stats_dict[variable]['min']) / (stats_dict[variable]['max'] - stats_dict[variable]['min'])
+        
+        elif normalisation_type == 'log':
+            ds[var_name] = log_plus_1(ds[var_name])
+            
+        elif normalisation_type == 'max':
+            ds[var_name] = ds[var_name] / stats_dict[variable]['max']
+            
+        elif normalisation_type == 'sqrt':
+            ds[var_name] = normalise_precipitation(ds[var_name], 'sqrt')
+
+        else:
+            raise ValueError(f'Unrecognised normalisation type for variable {var_name}')
+
+    return ds
+
+def load_hdf5_file(fp: str, group_name:str ='Grid'):
+    """
+    Load HDF5 file
+
+    Args:
+        fp (str): file path
+        group_name (str, optional): name of group to load. Defaults to 'Grid'.
+
+    Returns:
+        xr.Dataset: Dataset
+    """
+    ncf = netCDF4.Dataset(fp, diskless=True, persist=False)
+    nch = ncf.groups.get(group_name)
+    ds = xr.open_dataset(xr.backends.NetCDF4DataStore(nch))
+
+    return ds
+ 
+##🚩 we load the truth data
+
+def load_observational_data(data_source: str, *args, **kwargs):
+    """
+    Function to pick between various different sources of observational data
+
+    Args:
+        data_source (str): anme of data source
+
+    Returns:
+        np.ndarray: array of data
+    """
+    if data_source.lower() == 'imerg':
+        return load_imerg(*args, **kwargs)
+    else:
+        raise NotImplementedError(f'Data source {data_source} not implemented yet')
+
+
+def load_orography(filepath: str=OROGRAPHY_PATH, 
+                   latitude_vals: list=None, 
+                   longitude_vals: list=None,
+                   interpolate: bool=False):
+    """
+    Load orography values
+
+    Args:
+        filepath (str, optional): path to orography data. Defaults to OROGRAPHY_PATH.
+        latitude_vals (list, optional): list of latitude values to filter/interpolate to. Defaults to None.
+        longitude_vals (list, optional): list of longitude values to filter/interpolate to. Defaults to None.
+        interpolate (bool, optional): Whether or not to interpolate. Defaults to True.
+
+    Returns:
+        np.ndarray: orography data array
+    """
+    ds = xr.load_dataset(filepath)
+    
+    ##🚩 we needd to check this part 
+
+    
+    # Note that this assumes the orography is somewhat filtered already 
+    # If it is worldwide orography then normalised values will probably be too small!
+    ##🚩max_val = ds['h'].values.max()
+    max_val = ds['elevation'].values.max()
+       
+    if latitude_vals is not None and longitude_vals is not None:
+        if interpolate:
+            ds = interpolate_dataset_on_lat_lon(ds, latitude_vals=latitude_vals,
+                                                longitude_vals=longitude_vals,
+                                                interp_method='bilinear')
+        else:
+            ds = filter_by_lat_lon(ds, lon_range=longitude_vals, lat_range=latitude_vals)
+
+    ds = make_dataset_consistent(ds)
+
+    # Normalise and clip below to remove spectral artefacts
+    h_vals = ds['elevation'].values[ :, :]
+   # h_vals = ds['elevation'].values[0, :, :] ##🚩 change this
+    h_vals[h_vals < 5] = 5.0
+    h_vals = h_vals / max_val
+
+    ds.close()
+
+    return h_vals
+
+
+
+    ##🚩#change interpolate to False
+def load_land_sea_mask(filepath=LSM_PATH, 
+                       latitude_vals=None, 
+                       longitude_vals=None,
+                       interpolate=False):
+    """
+    Load land-sea mask values
+
+    Args:
+        filepath (str, optional): path to land-sea masj data. Defaults to LSM_PATH.
+        latitude_vals (list, optional): list of latitude values to filter/interpolate to. Defaults to None.
+        longitude_vals (list, optional): list of longitude values to filter/interpolate to. Defaults to None.
+        interpolate (bool, optional): Whether or not to interpolate. Defaults to True.
+
+    Returns:
+        np.ndarray: land-sea mask data array
+    """
+    ds = xr.load_dataset(filepath)
+    
+    if latitude_vals is not None and longitude_vals is not None:
+        if interpolate:
+            ds = interpolate_dataset_on_lat_lon(ds, latitude_vals=latitude_vals,
+                                                longitude_vals=longitude_vals,
+                                                interp_method='bilinear')
+        else:
+            ds = filter_by_lat_lon(ds, lon_range=longitude_vals, lat_range=latitude_vals)
+            
+    ds = make_dataset_consistent(ds)
+    
+    #lsm = ds['lsm'].values[0, :, :] ##🚩
+    lsm = ds['lsm'].values[ :, :]
+    
+    ds.close()
+    
+    return lsm
+
+
+def load_hires_constants(
+                         fields: Iterable,
+                         data_paths: dict,
+                         batch_size: int=1,
+                         latitude_vals: list=None, 
+                         longitude_vals: list=None):
+    """
+    Load hi resolution constants (land sea mask, orography)
+    
+    Note; this currently interpolates by default
+
+    Args:
+        batch_size (int, optional): Size of batch. Defaults to 1.
+        lsm_path (str, optional): path to land sea mask data. Defaults to LSM_PATH.
+        oro_path (str, optional): path to orography data. Defaults to OROGRAPHY_PATH.
+        latitude_vals (list, optional): list of latitude values to interpolate to. Defaults to None.
+        longitude_vals (list, optional): list of longitude values to interpolate to. Defaults to None.
+
+    Returns:
+        np.ndarray: array of data
+    """
+    
+    function_lookup = {'lsm': load_land_sea_mask,
+                       'orography': load_orography,
+                       'lakes': load_land_sea_mask,
+                       'sea': load_land_sea_mask}
+    
+    unrecognised_fields = [f for f in fields if f not in function_lookup]
+
+    if len(unrecognised_fields) > 0:
+        raise ValueError(f'Unrecognised constant field names: {unrecognised_fields}')
+    
+    constant_data = []
+    for field in fields:
+        tmp_array = function_lookup[field.lower()](filepath=data_paths[field.upper()],
+                                                            latitude_vals=latitude_vals,
+                                                            longitude_vals=longitude_vals)
+        tmp_array = np.expand_dims(tmp_array, axis=0)
+        
+        constant_data.append(tmp_array)
+    
+    return np.repeat(np.stack(constant_data, axis=-1), batch_size, axis=0)
+
+
+### These functions work with IFS / Nimrod.
+# TODO: unify the functions that load data from different sources
+
+def load_fcst_radar_batch(batch_dates: Iterable, 
+                          fcst_fields: list, 
+                          fcst_data_source: str, 
+                          obs_data_source: str, 
+                          fcst_dir: str,
+                          obs_data_dir: str,
+                          normalisation_strategy: dict,
+                          latitude_range: Iterable[float]=None,
+                          longitude_range: Iterable[float]=None,
+                          constants_dir: str=CONSTANTS_PATH,
+                          constant_fields: list=None, 
+                          hour: int=0, 
+                          normalise_inputs: bool=False,
+                          output_normalisation: bool=False):
+    batch_x = []
+    batch_y = []
+
+    if type(hour) == str:
+        if hour == 'random':
+            all_fcst_hours = np.array(range(24))
+            hours = all_fcst_hours[np.random.randint(24, size=[len(batch_dates)])]
+        else:
+            assert False, f"Not configured for {hour}"
+    elif np.issubdtype(type(hour), np.integer):
+        hours = len(batch_dates) * [hour]
+    else:
+        hours = hour
+
+    for i, date in enumerate(batch_dates):
+        h = hours[i]
+        batch_x.append(load_fcst_stack(fcst_data_source, fcst_fields, date, h,
+                                       latitude_vals=latitude_range, longitude_vals=longitude_range, fcst_dir=fcst_dir,
+                                       norm=normalise_inputs, constants_dir=constants_dir,
+                                       normalisation_strategy=normalisation_strategy))
+        
+        if obs_data_source is not None:
+            batch_y.append(load_observational_data(obs_data_source, date, h, normalisation_type=output_normalisation,
+                                                latitude_vals=latitude_range, longitude_vals=longitude_range,
+                                                data_dir=obs_data_dir))
+    if constant_fields is None:
+        return np.array(batch_x), np.array(batch_y)
+    else:
+        return [np.array(batch_x), load_hires_constants(batch_size=len(batch_dates), fields=constant_fields)], np.array(batch_y)
+
+
+##🚩Definition get_ngcm filepath
+def get_ngcm_filepath(field: str, loaddate: datetime, 
+                     loadtime: int, fcst_dir: str = NGCM_PATH):
+    """
+    Get ngcm filepath for time/data combination with variable/year structure.
+
+    Args:
+        field (str): name of field
+        loaddate (datetime): load datetime
+        loadtime (int): load time
+        fcst_dir (str, optional): directory of forecast data. Defaults to NGCM_PATH.
+
+    Returns:
+        str: filepath
+    """
+    # Extract year from loaddate for the filename and subdirectory
+    year = loaddate.year
+    # print(loaddate)
+    # print(loadtime)
+    
+    # Generate filename with the new structure
+    filename = f"{field}_{year}_ngcm_{field}_2.8deg_6h_GHA_{loaddate.strftime('%Y%m%d')}_{loadtime:02d}h.nc"
+
+    # Use the full field as the top-level folder (no normalization needed here)
+    variable_folder = field
+    
+    # Construct the full filepath with variable/year structure
+    fp = os.path.join(fcst_dir, variable_folder, str(year), filename)
+    
+    return fp
+
+
+##🚩Get the ngcm forecast_time
+def get_ngcm_forecast_time(year: int, 
+                          month: int, 
+                          day:int, hour: int):      
+    
+    """Get the closest NGCM forecast load (between 6-18h lead time) to the target
+    year/month/day/hour combination 
+    Args:
+        year (int): year    
+        month (int): month
+        day (int): day
+        hour (int): hour    
+    Returns:    
+        tuple: tuple containing (load date, load time)
+    """
+    time = datetime(year=year, month=month, day=day, hour=hour)
+    
+    if time.hour < 6:
+        loaddate = time  #  - timedelta(days=1)
+        loadtime = 0
+    elif 6 <= time.hour < 12:
+        loaddate = time
+        loadtime = 6
+    elif 12 <= time.hour < 18:
+        loaddate = time
+        loadtime = 12
+    elif 18 <= time.hour < 24:
+        loaddate = time
+        loadtime = 18
+    else:
+        raise ValueError("Not acceptable time")
+        
+    return loaddate, loadtime
+
+
+def get_imerg_forecast_time(year: int, 
+                          month: int, 
+                          day:int, hour: int):
+    
+    
+    
+    """    Get the closest IMERG forecast load (between 0-23h lead time) to the target  """
+    
+    time = datetime(year=year, month=month, day=day, hour=hour)
+    
+    if time.hour < 6:
+        loaddate = time  #  - timedelta(days=1)
+        loadtime = 0
+    elif 6 <= time.hour < 12:
+        loaddate = time
+        loadtime = 6
+    elif 12 <= time.hour < 18:
+        loaddate = time
+        loadtime = 12
+    elif 18 <= time.hour < 24:
+        loaddate = time
+        loadtime = 18
+    else:
+        raise ValueError("Not acceptable time")
+        
+    return loaddate, loadtime
+    
+
+##🚩Load ngcm raw 
+def load_ngcm_raw(field: str, 
+                 year: int, 
+                 month: int,
+                 day: int, hour: int, ngcm_data_dir: str=NGCM_PATH,
+                 latitude_vals: list=None, longitude_vals: list=None,
+                 interpolate: bool=True, ##🚩check if we need to change or not 
+                 convert_to_float_64: bool=False):  
+    """
+    Load raw NGCM data (i.e without any normalisation or conversion to mm/hr)   
+    Args:
+        field (str): name of field
+        year (int): year
+        month (int): month
+        day (int): day
+        hour (int): hour
+        ngcm_data_dir (str, optional): folder with NGCM data in. Defaults to NGCM_PATH.
+        latitude_vals (list, optional): latitude values to filter/interpolate to. Defaults to None.
+        longitude_vals (list, optional): longitude values to filter/interpolate to. Defaults to None.
+        interpolate (bool, optional): whether or not to interpolate. Defaults to True.
+        convert_to_float_64 (bool, optional): Whether or not to convert to float 64,
+    Returns:
+        xr.Dataset: dataset
+    """     
+    if not isinstance(latitude_vals[0], np.float32):
+        latitude_vals = np.array(latitude_vals).astype(np.float32)
+        longitude_vals = np.array(longitude_vals).astype(np.float32)
+
+    assert field in all_ngcm_fields, ValueError(f"field must be one of {all_ngcm_fields}")
+    
+    t = datetime(year=year, month=month, day=day, hour=hour)
+    t_plus_one = datetime(year=year, month=month, day=day, hour=hour) + timedelta(hours=1)
+
+    # Get the nearest forecast starttime
+    loaddate, loadtime = get_ngcm_forecast_time(year, month, day, hour)
+    
+    fp = get_ngcm_filepath(field=field,
+                          loaddate=loaddate,
+                          loadtime=loadtime,
+                          fcst_dir=ngcm_data_dir
+                          )
+
+    ds = xr.open_dataset(fp)
+    var_names = list(ds.data_vars)
+    
+    # if np.round(ds.longitude.values.max(), 6) < np.round(max(longitude_vals), 6) or np.round(ds.longitude.values.min(), 6) > np.round(min(longitude_vals), 6):
+    #     raise ValueError('Longitude range outside of data range')
+    
+    # if np.round(ds.latitude.values.max(), 6) < np.round(max(latitude_vals),6) or np.round(ds.latitude.values.min(),6) > np.round(min(latitude_vals), 6):
+    #     raise ValueError('Latitude range outside of data range')
+    
+    assert len(var_names) == 1, ValueError('More than one variable found; cannot automatically infer variable name')
+    var_name = list(ds.data_vars)[0]
+    
+    if convert_to_float_64:
+        # Multiplication with float32 leads to some discrepancies
+        # But in some cases this is outweighed by speed 
+        ds[var_name] = ds[var_name].astype(np.float64)
+      
+      
+    
+    # Account for cumulative fields
+    
+    ##🚩🚩  Note that this is only for the cumulative mean precipitation field
+    # which is the only one we use at the moment
+    # If we add more cumulative fields, this will need to be updated
+       
+    cumuative_fields=['precipitation_cumulative_mean']
+    conservative_fields=['precipitation_cumulative_mean']
+    surface_fields=['precipitation_cumulative_mean','evaporation']
+    if var_name in surface_fields:
+        # Output rainfall during the following hour
+        # ds =  ds.sel(date=t_plus_one) - ds.sel(date=t)   ##🚩🚩 change time to date
+    
+        
+        ds=ds.isel(time=-1).isel(surface=0) ##🚩🚩 change time to date
+ 
+    if latitude_vals is not None and longitude_vals is not None:
+        if interpolate:
+            if var_name in conservative_fields:
+                interpolation_method = 'conservative'
+            else:
+                interpolation_method = 'bilinear'
+            ds = interpolate_dataset_on_lat_lon(ds, latitude_vals=latitude_vals,
+                                                longitude_vals=longitude_vals,
+                                                interp_method=interpolation_method)
+        else:
+            ds = ds.sel(longitude=longitude_vals, method='backfill')
+            ds = ds.sel(latitude=latitude_vals, method='backfill')
+    
+    ds = make_dataset_consistent(ds)
+    
+    ds = ds.transpose('latitude', 'longitude')
+             
+    return ds
+
+
+##🚩Load ngcm 
+def load_ngcm(field: str, 
+             date, hour: int,
+             normalisation_strategy: dict,
+             norm: bool=False,
+             fcst_dir: str=NGCM_PATH,
+             latitude_vals: list=None, 
+             longitude_vals: list=None,
+             constants_path: str=CONSTANTS_PATH):   
+    """
+    Load NGCM (including normalisation and conversion to mm/hr)
+    Args:
+        field (str): name of field
+        date (str or datetime): YYYYMMDD string or datetime to forecast
+        hour (int): hour to forecast
+        norm (bool, optional): whether or not to normalise the data. Defaults to False.
+        fcst_dir (str, optional): forecast data directory. Defaults to NGCM_PATH.
+        normalisation_strategy (str, optional): dict with normalisation details for variables. Defaults to VAR_LOOKUP_NGCM.
+        latitude_vals (list, optional): latitude values to filter/interpolate to. Defaults to None.
+        longitude_vals (list, optional): longitude_vals to filter/interpolate to. Defaults to None.
+        constants_path (str, optional): path to constant data. Defaults to CONSTANTS_PATH.      
+    Returns:
+        np.ndarray: data for the specified field
+    """
+    if isinstance(date, str):
+        date = datetime.strptime(date, "%Y%m%d")
+        
+    ds = load_ngcm_raw(field, date.year, date.month, date.day, hour, ngcm_data_dir=fcst_dir,
+                      latitude_vals=latitude_vals, longitude_vals=longitude_vals, interpolate=True)
+    
+    var_name = list(ds.data_vars)[0]
+    
+    if not normalisation_strategy[field].get('negative_vals', True):
+        # Make sure no negative values
+        ds[var_name] = ds[var_name].clip(min=0)
+        
+    # if field in ['tp', 'cp', 'pr', 'prl', 'prc']:
+    #     # precipitation is measured in metres, so multiply up
+    #     ds[var_name] = 1000 * ds[var_name]
+        
+    # if field == 'cin':
+    #     # Replace null values with 0
+    #     ds[var_name] = ds[var_name].fillna(0)
+        
+    if norm:
+        stats_dict = get_ngcm_stats(field, latitude_vals=latitude_vals, longitude_vals=longitude_vals,
+                            use_cached=True, ngcm_data_dir=fcst_dir,
+                            output_dir=constants_path)
+        # Normalisation here      
+        ds = preprocess(field, ds, stats_dict=stats_dict, normalisation_strategy=normalisation_strategy)
+    
+    y = np.array(ds[var_name][:, :])
+    
+    return y
+
+
+##🚩we need to check this function also 
+
+def load_fcst_stack(data_source: str, fields: list, 
+                    date: str, hour: int, 
+                    fcst_dir: str, 
+                    normalisation_strategy: dict,
+                    constants_dir:str=CONSTANTS_PATH,
+                    norm:bool=False,
+                    latitude_vals:list=None, longitude_vals:list=None):
+    """
+    Load forecast 'stack' of all variables
+
+    Args:
+        data_source (str): source of data (e.g. ifs)
+        fields (list): list of fields to load
+        date (str): YYYYMMDD date string to forecast for
+        hour (int): hour to forecast for
+        fcst_dir (str): folder with forecast data in
+        normalisation_strategy (dict): normalisation strategy
+        constants_dir (str, optional): folder with constants data in. Defaults to CONSTANTS_PATH.
+        norm (bool, optional): whether or not to normalise the data. Defaults to False.
+        latitude_vals (list, optional): list of latitude values. Defaults to None.
+        longitude_vals (list, optional): list of longitude values. Defaults to None.
+
+    Returns:
+        np.ndarray: stacked array of specified variables
+    """
+    field_arrays = []
+
+    if data_source == 'ngcm':
+        load_function = load_ngcm
+    elif data_source == 'era5':
+        load_function = load_era5
+    else:
+        raise ValueError(f'Unknown data source {data_source}')
+
+    for f in fields:
+        field_arrays.append(load_function(f, date, hour, fcst_dir=fcst_dir,
+                                          latitude_vals=latitude_vals, longitude_vals=longitude_vals,
+                                          constants_path=constants_dir, norm=norm,
+                                          normalisation_strategy=normalisation_strategy))
+    return np.stack(field_arrays, -1)
+
+##🚩get ngcm stats
+   
+def get_ngcm_stats(field: str, latitude_vals: list, longitude_vals: list, output_dir: str=None,
+                   use_cached: bool=True, year: int=NORMALISATION_YEAR,
+                   ngcm_data_dir: str=NGCM_PATH, hours: list=all_fcst_hours):
+    """
+    Get statistics for NGCM data        
+    Args:
+        field (str): name of field
+        latitude_vals (list): list of latitude values
+        longitude_vals (list): list of longitude values 
+        output_dir (str, optional): directory to save output. Defaults to None.
+        use_cached (bool, optional): whether to use cached stats. Defaults to True.
+        year (int, optional): year to calculate stats for. Defaults to NORMALISATION_YEAR
+        ngcm_data_dir (str, optional): directory with NGCM data. Defaults to NGCM_PATH.
+        hours (list, optional): list of hours to calculate stats for. Defaults to all_fcst_hours.   
+    Returns:
+        dict: dictionary with statistics
+    """ 
+    min_lat = int(min(latitude_vals))
+    max_lat = int(max(latitude_vals))
+    min_lon = int(min(longitude_vals))
+    max_lon = int(max(longitude_vals))
+
+
+    fp =STATS_PATH 
+
+    var_name = None
+
+    if use_cached and os.path.isfile(fp):
+        logger.debug('Loading stats from cache')
+
+        with open(fp, 'rb') as f:
+            stats = pickle.load(f)
+
+    else:
+        print('Calculating stats')
+        all_dates = list(pd.date_range(start=f'{year}-01-01', end=f'{year}-12-01', freq='D'))
+        all_dates = [item.date() for item in all_dates]
+
+        datasets = []
+        
+        for date in all_dates:
+            year = date.year
+            month = date.month
+            day = date.day
+            
+            for hour in hours:
+            
+                tmp_ds = load_ngcm_raw(field, year, month, day, hour, 
+                                    latitude_vals=latitude_vals,
+                                    longitude_vals=longitude_vals, 
+                                    ifs_data_dir=ngcm_data_dir,
+                                    interpolate=False)
+                if not var_name:
+                    var_names = list(tmp_ds.data_vars)
+                    assert len(var_names) == 1, ValueError('More than one variable found; cannot automatically infer variable name')
+                    var_name = list(tmp_ds.data_vars)[0]
+
+                datasets.append(tmp_ds)
+        concat_ds = xr.concat(datasets, dim='time')
+
+        stats = {'min': np.abs(concat_ds[var_name]).min().values,
+                'max': np.abs(concat_ds[var_name]).max().values,
+                'mean': concat_ds[var_name].mean().values,
+                'std': concat_ds[var_name].std().values}
+
+        if output_dir:
+            with open(fp, 'wb') as f:
+                pickle.dump(stats, f, pickle.HIGHEST_PROTOCOL)
+
+    return stats
+  
+    
+
+### Functions that work with the ERA5 data in University of Bristol
+
+
+def get_era5_filepath_prefix(variable, era_data_dir=ERA5_PATH,
+                             var_name_lookup=VAR_LOOKUP_ERA5):
+    filepath_attrs = var_name_lookup[variable]
+
+    if filepath_attrs.get('subfolder'):
+        return os.path.join(era_data_dir, '{folder}/{subfolder}/ERA5_{subfolder}_{suffix}'.format(**filepath_attrs))
+    else:
+        return os.path.join(era_data_dir, '{folder}/ERA5_{folder}_{suffix}'.format(**filepath_attrs))
+
+
+def get_era5_path(variable, year, month, era_data_dir=ERA5_PATH, var_name_lookup=VAR_LOOKUP_ERA5):
+    suffix = get_era5_filepath_prefix(variable=variable, era_data_dir=era_data_dir, var_name_lookup=var_name_lookup)
+    
+    if month == '*':
+        return f'{suffix}_{year}{month}.nc'
+    else:
+        return f'{suffix}_{year}{int(month):02d}.nc'
+
+
+def load_era5_month_raw(variable, year, month, latitude_vals=None, longitude_vals=None,
+                        era_data_dir=ERA5_PATH, interpolate=True):
+    
+    ds = xr.load_dataset(get_era5_path(variable, year=year, month=month, era_data_dir=era_data_dir))
+
+    # Multiplication with float32 leads to some discrepancies
+    ds[variable] = ds[variable].astype(np.float64)
+       
+    interpolation_method = 'conservative' if variable == 'tp' else 'bilinear'
+    
+    # only works if longitude and latitude vals specified together
+    if latitude_vals is not None and longitude_vals is not None:
+        if interpolate:
+            ds = interpolate_dataset_on_lat_lon(ds, latitude_vals=latitude_vals,
+                                                longitude_vals=longitude_vals,
+                                                interp_method=interpolation_method)
+        else:
+            ds = filter_by_lat_lon(ds, lon_range=longitude_vals, lat_range=latitude_vals)
+
+    # Make sure dataset is consistent with others
+    ds = make_dataset_consistent(ds)
+    
+    if variable == 'tp':
+        # Convert to mm
+        ds['tp'] = ds['tp'] * 1000
+    
+    return ds
+
+
+def load_era5_day_raw(variable: str, year: int, month: int, 
+                      day: int, latitude_vals: list=None, 
+                      longitude_vals: list=None,
+                      era_data_dir: str=ERA5_PATH, interpolate: bool=True):
+
+    month_ds = load_era5_month_raw(variable, year, month, latitude_vals=latitude_vals,
+                                    longitude_vals=longitude_vals,
+                                    era_data_dir=era_data_dir, interpolate=interpolate)
+
+    day_ds = month_ds.sel(time=f'{year}-{int(month):02d}-{int(day):02d}')
+    
+    return day_ds
+
+
+def get_era5_stats(variable: str, longitude_vals: list, latitude_vals: list, 
+                   year: int=NORMALISATION_YEAR, output_dir: int=None,
+                   era_data_dir: int=ERA5_PATH, use_cached: bool=False):
+    
+    min_lat = int(min(latitude_vals))
+    max_lat = int(max(latitude_vals))
+    min_lon = int(min(longitude_vals))
+    max_lon = int(max(longitude_vals))
+        
+    # Filepath is spcific to make sure we don't use the wrong normalisation stats
+    fp = f'{output_dir}/ERA_norm_{variable}_{year}_lat{min_lat}-{max_lat}lon{min_lon}-{max_lon}.pkl'
+
+    if use_cached and os.path.isfile(fp):
+        logger.debug('Loading stats from cache')
+
+        with open(fp, 'rb') as f:
+            stats = pickle.load(f)
+
+    else:
+
+        all_dates = list(pd.date_range(start=f'{year}-01-01', end=f'{year}-12-01', freq='M'))
+        all_dates = [item.date() for item in all_dates]
+
+        datasets = []
+
+        for date in all_dates:
+            year = date.year
+            month = date.month
+            tmp_ds = load_era5_month_raw(variable, year, month, latitude_vals=latitude_vals,
+                                         longitude_vals=longitude_vals, 
+                                         era_data_dir=era_data_dir,
+                                         interpolate=False)
+
+            datasets.append(tmp_ds)
+        concat_ds = xr.concat(datasets, dim='time')
+
+        stats = {'min': np.abs(concat_ds[variable]).min().values,
+                'max': np.abs(concat_ds[variable]).max().values,
+                'mean': concat_ds[variable].mean().values,
+                'std': concat_ds[variable].std().values}
+
+        if output_dir:
+            with open(fp, 'wb') as f:
+                pickle.dump(stats, f, pickle.HIGHEST_PROTOCOL)
+
+    return stats
+
+
+def load_era5(ifield, date, hour=0, log_precip=False, norm=False, fcst_dir=ERA5_PATH,
+              latitude_vals=None, longitude_vals=None, var_name_lookup=VAR_LOOKUP_ERA5,
+              constants_path=CONSTANTS_PATH):
+    """
+
+    Function to fetch ERA5 data, designed to match the structure of the load_fcst function, so they can be interchanged
+
+    Args:
+        latitude_vals:
+        constants_path:
+        ifield: field to load
+        date: str, date in form YYYYMMDD
+        hour: int or list, hour or hours to fetch from (Obsolete in this case as only daily data)
+        log_precip: Boolean, whether to take logs of the data (Obsolete for this case as using config)
+        norm: Boolean, whether to normalise (obsolete in this case as using config)
+        fcst_dir:
+
+    Returns:
+
+    """
+    dt = datetime.strptime(date, '%Y%m%d')
+
+    ds = load_era5_day_raw(variable=ifield, year=dt.year, month=dt.month, day=dt.day,
+                        latitude_vals=latitude_vals, longitude_vals=longitude_vals,
+                        era_data_dir=fcst_dir)
+
+
+    stats_dict = get_era5_stats(ifield, latitude_vals=latitude_vals, longitude_vals=longitude_vals,
+                                use_cached=True, era_data_dir=fcst_dir,
+                                output_dir=constants_path)
+
+    if norm:
+        # Normalisation here      
+        ds = preprocess(ifield, ds, stats_dict=stats_dict, var_name_lookup=var_name_lookup)
+    
+    # Only one time index should be returned since this is daily data
+    y = np.array(ds[ifield][0, :, :])
+    ds.close()
+
+    if ifield == 'tp' and log_precip == True:
+        y = normalise_precipitation(y, normalisation_type='log')
+
+    ds.close()
+
+    return y
+
+ ##🚩I update the function to collect the imerg file
+ 
+def get_imerg_filepaths(year: int, month: int, day: int, 
+                        hour: int, imerg_data_dir: str=IMERG_PATH, 
+                        file_ending: str='.nc'):
+    
+    dt_start = datetime(year, month, day, hour) 
+    year_str = dt_start.strftime('%Y')
+    file_name=dt_start.strftime('%Y%m%d_%H') + file_ending
+    
+    imerg_file_path=os.path.join(imerg_data_dir, year_str, file_name)        
+    
+    return [imerg_file_path]
+ 
+  ##🚩this function need to be check    
+def load_imerg_raw(year: int, month: int, day: int, 
+                   hour:int, latitude_vals: list=None, 
+                   longitude_vals: list=None,
+                   imerg_data_dir: str=IMERG_PATH, file_ending: str='.nc'):
+
+    if isinstance(latitude_vals, list):
+        latitude_vals = np.array(latitude_vals)
+        
+    if isinstance(longitude_vals, list):
+        longitude_vals = np.array(longitude_vals)
+        
+    if not isinstance(latitude_vals[0], np.float32):
+        latitude_vals = latitude_vals.astype(np.float32)
+        longitude_vals = longitude_vals.astype(np.float32)
+    
+    
+    loaddate, loadtime = get_imerg_forecast_time(year, month, day, hour)
+    
+    fps = get_imerg_filepaths(loaddate.year, loaddate.month, loaddate.day, loadtime, imerg_data_dir=imerg_data_dir, file_ending=file_ending)
+    
+    datasets = []
+    
+    for fp in fps:
+        if file_ending.lower() == '.nc':
+            datasets.append(xr.load_dataset(fp))
+        elif file_ending.lower() == '.hdf5':
+            datasets.append(load_hdf5_file(fp, 'Grid'))
+        else:
+            raise IOError(f'File formats {file_ending} not supported')
+
+    ds = xr.concat(datasets, dim='time').mean('time')
+        
+    # Make sure dataset is consistent with others
+    ds = make_dataset_consistent(ds)
+    ds = ds.transpose('latitude', 'longitude')
+
+    return ds
+
+
+def load_imerg(date: datetime, hour: int=18, data_dir: str=IMERG_PATH,
+               latitude_vals: list=None, longitude_vals: list=None,
+               normalisation_type: str=None):
+    """
+
+     Function to fetch iMERG data, designed to match the structure of the load_radar function, so they can be
+     interchanged
+
+     Args:
+         date: str, date in form YYYYMMDD
+         hour: int or list, hour or hours to fetch from (Obsolete in this case as only daily data)
+         log_precip: Boolean, whether to take logs of the data (Obsolete for this case as using config)
+         radar_dir: str, directory where imerg data is stored
+
+     Returns:
+
+     """
+    if isinstance(date, str):
+        date = datetime.strptime(date, '%Y%m%d')
+        
+    ds = load_imerg_raw(year=date.year, month=date.month, day=date.day, hour=hour,
+                        latitude_vals=latitude_vals, longitude_vals=longitude_vals, imerg_data_dir=data_dir)
+
+    # Take mean since data may be half hourly
+    precip = ds['precipitation'].values
+    ds.close()
+    
+    if normalisation_type is not None:
+        precip = normalise_precipitation(precip, normalisation_type=normalisation_type)
+
+    return precip
+
+
+
+
+
+STATS_PATH = "gs://melvin_aims_bucket/FCSTNorm/neuralgcm_Horn_Africa_2018_stats.pkl"
+
+def load_ngcm_stats(stats_path=STATS_PATH):
+    """
+    Load neural GCM stats pickle file from Google Cloud Storage.
+
+    Args:
+        stats_path (str): Full GCS path to the pickle file.
+
+    Returns:
+        object/dict: Contents of the pickle file.
+    """
+    if not stats_path.startswith("gs://"):
+        raise ValueError("The stats_path must be a GCS path starting with 'gs://'")
+
+    # Connect to GCS
+    fs = gcsfs.GCSFileSystem()
+
+    # Check if file exists
+    if not fs.exists(stats_path):
+        raise FileNotFoundError(f"The file {stats_path} does not exist on GCS")
+
+    # Load pickle from GCS
+    with fs.open(stats_path, "rb") as f:
+        fcst_norm = pickle.load(f)
+
+    return fcst_norm
+
+# # Usage
+# try:
+#     fcst_norm = load_ngcm_stats()
+# except Exception as e:
+#     print(f"Could not load neural GCM stats: {e}")
+#     fcst_norm = None
+
+
+
+
+
+
+
+##🚩modify parameter to run the code 
+if __name__ == '__main__':
+
+    # Batch job for loading / saving only the relevant data
+
+    parser = ArgumentParser(description='Subset data to desired lat/lon range')
+    parser.add_argument('--fcst-data-source', choices=['ifs', 'era5','ngcm'], type=str,
+                        help='Source of forecast data')
+    parser.add_argument('--obs-data-source', choices=['nimrod', 'imerg'], type=str,
+                        help='Source of observational (ground truth) data')
+    parser.add_argument('--years', default=2018, nargs='+', type=int,
+                        help='Year(s) to process (space separated)')
+    parser.add_argument('--months', default=list(range(1, 13)), nargs='+', type=int,
+                        help='Year(s) to process (space separated)')
+    parser.add_argument('--output-dir', type=str, required=True)
+    parser.add_argument('--min-latitude', type=int, required=True)
+    parser.add_argument('--max-latitude', type=int, required=True)
+    parser.add_argument('--min-longitude', type=int, required=True)
+    parser.add_argument('--max-longitude', type=int, required=True)
+    parser.add_argument('--input-obs-folder', type=str, default=None)
+
+    args = parser.parse_args()
+
+    print(args)
+    
+    years = [args.years] if isinstance(args.years, int) else args.years
+
+    latitude_vals = range(args.min_latitude -1, args.max_latitude + 1)
+    longitude_vals = range(args.min_longitude -1, args.max_longitude + 1)
+
+    if not os.path.isdir(args.output_dir):
+        raise IOError('Output directory does not exist! Please create it or specify a different one')
+
+    imerg_folders = ['IMERG', 'half_hourly', 'final']
+    era5_output_dir = os.path.join(args.output_dir, 'ERA5')
+    imerg_output_dir = os.path.join(args.output_dir, '/'.join(imerg_folders))
+    
+
+    if not os.path.isdir(era5_output_dir):
+        os.mkdir(era5_output_dir)
+
+    for _, properties in VAR_LOOKUP_ERA5.items():
+
+        var_folder = os.path.join(era5_output_dir, properties['folder'])
+        if not os.path.isdir(var_folder):
+            os.mkdir(var_folder)
+
+        subfolder = properties.get('subfolder')
+
+        if subfolder:
+            subfolder = os.path.join(var_folder, subfolder)
+            if not os.path.isdir(subfolder):
+                os.mkdir(subfolder)
+    
+    dir = args.output_dir
+    for folder in imerg_folders:
+        current_dir = os.path.join(dir, folder)
+        if not os.path.isdir(current_dir):
+            os.mkdir(current_dir)
+        dir = os.path.join(dir, folder)
+
+    all_imerg_dates = []
+    for year in years:
+        for month in args.months:
+            for day in range(1, monthrange(year, month)[1]+1):
+                for hour in range(0, 24):
+                    all_imerg_dates.append((year, month, day, hour))
+    
+    print('starting observational data gathering')
+    for date_item in tqdm(all_imerg_dates, total=len(all_imerg_dates), position=0, leave=True):
+
+        year, month, day, hour = date_item
+
+        fps = glob(os.path.join(args.input_obs_folder, 
+                                f'3B-HHR.MS.MRG.3IMERG.{year}{month:02d}{day:02d}-S{hour:02d}*'))
+        
+        if len(fps) == 0:
+            print(f'No files found for {year}{month:02d}{day:02d}-S{hour:02d}')
+        
+        for fp in fps:
+            ds =load_hdf5_file(fp)
+            ds = filter_by_lat_lon(ds, lon_range=longitude_vals, 
+                                   lat_range=latitude_vals)
+            path_suffix = fp.split('/')[-1]
+            imerg_path = os.path.join(imerg_output_dir, path_suffix).replace('.HDF5', '.nc')
+            ds.to_netcdf(imerg_path)
+            ds.close()
+    print('Observational data gathering complete')

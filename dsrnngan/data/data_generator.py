@@ -51,7 +51,7 @@ class DataGenerator(Sequence):
 
             if self.forecast_data_source == 'era5':
                 raise ValueError('ERA5 data only supports daily')
-            #  ##🚩update this part if self.forecast_data_source == 'ngcm': 
+            getitem
         else:
             raise ValueError(f"Unsupported hour {hour}")
     

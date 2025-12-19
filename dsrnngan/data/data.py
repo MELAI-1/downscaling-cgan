@@ -106,8 +106,6 @@ IFS_NORMALISATION_STRATEGY = data_config.input_normalisation_strategy
 ##🚩NGCM NORMALISATION STRATEGY
 NGCM_NORMALISATION_STRATEGY = data_config.ngcm_input_normalisation_strategy
 
-VAR_LOOKUP_IFS = {field: IFS_NORMALISATION_STRATEGY[re.sub(r'([0-9]*[a-z]+)[0-9]*', r'\1', field)] 
-                  for field in all_ifs_fields}
 
 # ##🚩NGCM Var lookup
 # VAR_LOOKUP_NGCM = {field: NGCM_NORMALISATION_STRATEGY[re.sub(r'([a-z_]+)[0-9]+', r'\1', field).rstrip('_')] 
