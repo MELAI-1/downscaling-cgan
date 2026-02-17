@@ -104,7 +104,8 @@ constant_fields = 2
 
 # Set up pre-trained GAN
 weights_fn = os.path.join(model_folder, "models", f"gen_weights-{checkpoint:07}.h5")
-input_channels = 4*len(all_ngcm_fields)
+# input_channels = 4*len(all_ngcm_fields)
+input_channels = len(all_ngcm_fields)
 
 
 ##🚩define the path of the configuration after the training 
