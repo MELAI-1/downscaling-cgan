@@ -28,8 +28,11 @@ from dsrnngan.data.data_gefs import (
     normalise_precipitation,
     denormalise,
     load_hires_constants,
-    load_ngcm_stats
+    load_ngcm_stats,
+    interpolate_dataset_on_lat_lon,
+    
 )
+
 from dsrnngan.utils.read_config import set_gpu_mode, get_data_paths
 from dsrnngan.model.setupmodel import load_model_from_folder,setup_model
 from dsrnngan.model.noise import NoiseGenerator
@@ -260,16 +263,17 @@ def make_fcst(input_folder=input_folder, output_folder=output_folder,
                 # nc_in[field] has shape len(nc_in["time"]) x 29 x 384 x 352
                 
                 # Open input netCDF file
-                input_file = f"{field}_{d.year}.zarr"
+                input_file = f"{field}_{d.year}.nc"
                 nc_in_path = os.path.join(input_folder_year, input_file)
-                nc_file = xr.open_zarr(nc_in_path)
+                nc_file = xr.open_dataset(nc_in_path)
                 nc_file = nc_file.sel(
             {"time":day}).isel({"step":[in_time_idx-5,in_time_idx-4]}
                 )
                 short_name = [var for var in nc_file.data_vars][0]
                 data = np.moveaxis(np.squeeze(nc_file[short_name].values),0,-1)
                 data=tf.constant(data)
-                data = tf.image.resize(data,[384,352]).numpy()
+                # data = tf.image.resize(data,[384,352]).numpy()
+                # data=interpolate_dataset_on_lat_lon(data,[])
                                       
                 if field in nonnegative_fields:
                     data = np.maximum(data, 0.0)
