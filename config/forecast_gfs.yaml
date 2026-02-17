@@ -1,0 +1,15 @@
+##🚩Please update this path and the informations here to have the suitable evaluation 
+
+MODEL:
+    folder: "gs://melvin_aims_bucket/cgan5/_cgan_5/" #"in this case the data are stored in the google cloud bucket"
+    checkpoint: 36000 
+
+INPUT:
+    folder: "gs://melvin_aims_bucket/NCGM/"
+    dates: ["2024-04-20"]
+    start_hour: 30
+    end_hour: 54
+
+OUTPUT:
+    folder: "gs://melvin_aims_bucket/cgan5/_cgan_5/forecasts/"
+    ensemble_members: 50

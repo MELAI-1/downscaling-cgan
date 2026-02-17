@@ -3,7 +3,7 @@ logs/
 test-det/
 test-logs/
 *.pdf
-*.yaml
+# *.yaml
 *.pkl
 *.tfrecords
 *.jpg
@@ -20,7 +20,7 @@ system_tests/data/tmp_model_test/
 */*/tmp
 *.o
 wandb/
-*.ipynb
+# *.ipynb
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
