@@ -2,9 +2,9 @@ jupyter/
 logs/
 test-det/
 test-logs/
-*.pdf
+# *.pdf
 # *.yaml
-*.pkl
+# *.pkl
 *.tfrecords
 *.jpg
 *.txt
