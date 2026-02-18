@@ -101,8 +101,8 @@ class WGANGP(object):
                     # generate ensemble of predictions and add mean to gen_trainer output
                     preds = [self.gen([gen_in[0], gen_in[1], gen_in[3+ii]])
                              for ii in range(self.ensemble_size)]
-                    # preds = tf.stack(preds)
-                    preds = ops.stack(preds)
+                    preds = tf.stack(preds)
+                    # preds = ops.stack(preds)
                     # preds=keras.ops.stack(preds)
                     full_gen_out.append(preds)
                 self.gen_trainer = Model(inputs=gen_in,
