@@ -31,6 +31,8 @@ from dsrnngan.data.data_gefs import (
     load_ngcm_stats,
     interpolate_dataset_on_lat_lon,
     constant_fields,
+    OROGRAPHY_PATH ,
+    LSM_PATH
     
 )
 
@@ -164,7 +166,7 @@ gen.load_weights(weights_fn)
 #                              model_number=fcst_params["MODEL"]["checkpoint"])
 
 
-network_const_input = load_hires_constants(batch_size=1,fields=constant_fields)  # 1 x lats x lons x 2
+network_const_input = load_hires_constants(batch_size=1,fields=constant_fields,data_paths:{"LSM":LSM_PATH,"OROGRAPHY": OROGRAPHY_PATH})  # 1 x lats x lons x 2
 # %%
 
 
