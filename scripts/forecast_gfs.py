@@ -276,7 +276,10 @@ def make_fcst(input_folder=input_folder, output_folder=output_folder,
                 # nc_in[field] has shape len(nc_in["time"]) x 29 x 384 x 352
                 
                 # Open input netCDF file
-                input_file = f"{field}_{d.year}.nc"
+                # input_file = f"{field}_{d.year}.nc"
+                #I have to update this part 
+                
+                input_file=f"{field}_{d.year}_ngcm_{field}_2.8deg_6h_GHA_{loaddate.strftime('%Y%m%d')}_{loadtime:02d}h.nc"
                 nc_in_path = os.path.join(input_folder_year, input_file)
                 nc_file = xr.open_dataset(nc_in_path)
                 nc_file = nc_file.sel(
