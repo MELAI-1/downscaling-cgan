@@ -62,12 +62,17 @@ assert fcst_norm is not None
 # %%
 ##🚩 setting of the models 
 # Open and parse forecast.yaml
-fcstyaml_path = "../config/forecast_gfs.yaml"
+
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+fcstyaml_path = os.path.join(SCRIPT_DIR, "..", "config", "forecast_gfs.yaml")
+fcstyaml_path = os.path.normpath(fcstyaml_path)
+
+# Open and parse forecast.yaml
 with open(fcstyaml_path, "r") as f:
     try:
         fcst_params = yaml.safe_load(f)
     except yaml.YAMLError as exc:
-        print(exc)
+        print(f"Error parsing YAML file: {exc}")
 
 # # %%
 model_folder = fcst_params["MODEL"]["folder"]
