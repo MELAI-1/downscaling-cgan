@@ -3,6 +3,9 @@
 MODEL:
     folder: "gs://melvin_aims_bucket/cgan5/_cgan_5/" #"in this case the data are stored in the google cloud bucket"
     checkpoint: 36000 
+    config_path: "gs://melvin_aims_bucket/cgan5/_cgan_5/model_config.yaml"
+    local_weights_dir: "notebooks/models"
+    
 
 INPUT:
     folder: "gs://melvin_aims_bucket/NCGM/"
@@ -13,3 +16,6 @@ INPUT:
 OUTPUT:
     folder: "/home/melvin_aims_ac_za/notebooks/outputs/"
     ensemble_members: 50
+
+Data:
+    data_path: "gs://melvin_aims_bucket/cgan5/_cgan_5/data_config.yaml"
