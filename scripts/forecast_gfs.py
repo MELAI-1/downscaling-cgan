@@ -43,6 +43,7 @@ import tensorflow as tf
 from dsrnngan.utils.read_config import read_model_config,read_data_config
 
 from datetime import datetime, timedelta
+from pathlib import Path
 
 # %%
 # Define the latitude and longitude arrays for later
@@ -83,6 +84,7 @@ start_hour = fcst_params["INPUT"]["start_hour"]
 end_hour = fcst_params["INPUT"]["end_hour"]
 output_folder = fcst_params["OUTPUT"]["folder"]
 ensemble_members = fcst_params["OUTPUT"]["ensemble_members"]
+config_path = fcst_params["MODEL"]["config_path"]
 
 assert start_hour % HOURS == 0, f"start_hour must be divisible by {HOURS}"
 assert end_hour % HOURS == 0, f"end_hour must be divisible by {HOURS}"
@@ -91,7 +93,6 @@ assert end_hour % HOURS == 0, f"end_hour must be divisible by {HOURS}"
 ##🚩 please don't forget to make sure the yaml file model_config.yaml is as the correct path with the correct parameters 
 # config_path = os.path.join(model_folder, "model_config.yaml")
 
-config_path = "gs://melvin_aims_bucket/cgan5/_cgan_5/model_config.yaml"
 
 # Connect to GCS
 fs = gcsfs.GCSFileSystem()
@@ -121,8 +122,8 @@ input_channels = len(all_ngcm_fields)
 
 ##🚩define the path of the configuration after the training 
 #define the config 
-MODEL_CONFIG_PATH = "gs://melvin_aims_bucket/cgan5/_cgan_5/model_config.yaml"
-DATA_CONFIG_PATH  = "gs://melvin_aims_bucket/cgan5/_cgan_5/data_config.yaml"
+MODEL_CONFIG_PATH = config_path 
+DATA_CONFIG_PATH  = fcst_params["Data"]["data_path"]
 
 
 def load_yaml(path: str):
@@ -161,7 +162,22 @@ model = setup_model(
 gen = model.gen
 # gen.load_weights(weights_fn)
 ##🚩load the weight for a specific gen
-weights_fn = '/home/melvin_aims_ac_za/downscaling-cgan/notebooks/models/gen_weights-0036000.h5'
+
+def get_weights_path(params, repo_name="downscaling-cgan"):
+    
+    base_path = Path(f"/content/{repo_name}") 
+    checkpoint = params['MODEL']['checkpoint']
+    rel_path = params['MODEL'].get('local_weights_dir', 'notebooks/models')
+    weight_file = f"gen_weights-{checkpoint:07d}.h5"
+    full_path = base_path / rel_path / weight_file
+    
+    if not full_path.exists():
+        raise FileNotFoundError(f"Weights not found at: {full_path}")
+        
+    return str(full_path)
+
+weights_fn = get_weights_path(fcst_params)
+print(f" Model weights localized: {weights_fn}")
 gen.load_weights(weights_fn)
 
 
