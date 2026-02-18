@@ -30,6 +30,7 @@ from dsrnngan.data.data_gefs import (
     load_hires_constants,
     load_ngcm_stats,
     interpolate_dataset_on_lat_lon,
+    constant_fields,
     
 )
 
@@ -163,8 +164,11 @@ gen.load_weights(weights_fn)
 #                              model_number=fcst_params["MODEL"]["checkpoint"])
 
 
-network_const_input = load_hires_constants(batch_size=1)  # 1 x lats x lons x 2
+network_const_input = load_hires_constants(batch_size=1,fields=constant_fields)  # 1 x lats x lons x 2
 # %%
+
+
+##🚩Please what are the parameters I need to update here ?
 def create_output_file(nc_out_path):
     netcdf_dict = {}
     rootgrp = nc.Dataset(nc_out_path, "w", format="NETCDF4")
