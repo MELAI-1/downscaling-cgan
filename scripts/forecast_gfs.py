@@ -170,7 +170,7 @@ gen.load_weights(weights_fn)
 data_paths={"LSM":LSM_PATH,
             "OROGRAPHY": OROGRAPHY_PATH}
 
-network_const_input = load_hires_constants(batch_size=1,fields=constant_fields,data_paths=data_paths)  # 1 x lats x lons x 2
+network_const_input = load_hires_constants(batch_size=1,fields=["orography","lsm"],data_paths=data_paths)  # 1 x lats x lons x 2
 # %%
 
 
