@@ -11,5 +11,5 @@ INPUT:
     end_hour: 54
 
 OUTPUT:
-    folder: "gs://melvin_aims_bucket/cgan5/_cgan_5/forecasts/"
+    folder: "/home/melvin_aims_ac_za/notebooks/outputs/"
     ensemble_members: 50
