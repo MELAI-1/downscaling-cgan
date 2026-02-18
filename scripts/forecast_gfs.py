@@ -151,6 +151,9 @@ model = setup_model(
 )
 # Load weights
 gen = model.gen
+# gen.load_weights(weights_fn)
+##🚩load the weight for a specific gen
+weights_fn = '/home/melvin_aims_ac_za/downscaling-cgan/notebooks/models/gen_weights-0036000.h5'
 gen.load_weights(weights_fn)
 
 
