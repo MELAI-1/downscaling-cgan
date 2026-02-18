@@ -166,7 +166,11 @@ gen.load_weights(weights_fn)
 #                              model_number=fcst_params["MODEL"]["checkpoint"])
 
 
-network_const_input = load_hires_constants(batch_size=1,fields=constant_fields,data_paths:{"LSM":LSM_PATH,"OROGRAPHY": OROGRAPHY_PATH})  # 1 x lats x lons x 2
+#add the path of the constant
+data_paths={"LSM":LSM_PATH,
+            "OROGRAPHY": OROGRAPHY_PATH}
+
+network_const_input = load_hires_constants(batch_size=1,fields=constant_fields,data_path=data_paths)  # 1 x lats x lons x 2
 # %%
 
 
