@@ -6,7 +6,7 @@ MODEL:
 
 INPUT:
     folder: "gs://melvin_aims_bucket/NCGM/"
-    dates: ["2024-04-20"]
+    dates: ["2018-01-01"]
     start_hour: 30
     end_hour: 54
 
