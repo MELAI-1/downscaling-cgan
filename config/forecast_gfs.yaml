@@ -3,12 +3,12 @@
 MODEL:
     folder: "gs://melvin_aims_bucket/cgan5/_cgan_5/" #"in this case the data are stored in the google cloud bucket"
     checkpoint: 36000 
-    config_path: "gs://melvin_aims_bucket/cgan5/_cgan_5/model_config.yaml"
+    config_path: "gs://melvin_aims_bucket/cgan5/_cgan_5/model_config.yaml" #Download the cgan_5 folder and change this
     local_weights_dir: "notebooks/models"
     
 
 INPUT:
-    folder: "gs://melvin_aims_bucket/NCGM/"
+    folder: "gs://melvin_aims_bucket/NCGM/" #the place where the NGCM data are
     dates: ["2018-01-01"]
     start_hour: 30
     end_hour: 54
