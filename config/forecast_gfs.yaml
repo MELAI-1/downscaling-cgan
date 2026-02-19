@@ -14,7 +14,7 @@ INPUT:
     end_hour: 54
 
 OUTPUT:
-    folder: "/outputs/" #The place where to save the output
+    folder: "/content/output_test/" #The place where to save the output
     ensemble_members: 50
 
 Data:
