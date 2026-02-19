@@ -497,7 +497,7 @@ def load_orography(filepath: str=OROGRAPHY_PATH,
     Returns:
         np.ndarray: orography data array
     """
-    ds = xr.load_dataset(filepath)
+    ds = xr.load_dataset(filepath,engine='h5netcdf')
     
     ##🚩 we needd to check this part 
 
@@ -546,7 +546,7 @@ def load_land_sea_mask(filepath=LSM_PATH,
     Returns:
         np.ndarray: land-sea mask data array
     """
-    ds = xr.load_dataset(filepath)
+    ds = xr.load_dataset(filepath,engine='h5netcdf')
     
     if latitude_vals is not None and longitude_vals is not None:
         if interpolate:
