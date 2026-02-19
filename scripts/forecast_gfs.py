@@ -371,11 +371,11 @@ def make_fcst(input_folder=input_folder, output_folder=output_folder,
             local_tmp_dir, f"GAN_{d.year}{d.month:02}{d.day:02}.nc"
         )
 
-        # Write NetCDF to local path
-        netcdf_dict = create_output_file(nc_out_path_local)
-        netcdf_dict["time_data"][0] = date2num(
-            d, units="hours since 1900-01-01 00:00:00.0"
-        )
+        # # Write NetCDF to local path
+        # netcdf_dict = create_output_file(nc_out_path_local)
+        # netcdf_dict["time_data"][0] = date2num(
+        #     d, units="hours since 1900-01-01 00:00:00.0"
+        # )
 
         for out_time_idx, in_time_idx in enumerate(
             range(start_hour // HOURS, end_hour // HOURS)
@@ -383,11 +383,11 @@ def make_fcst(input_folder=input_folder, output_folder=output_folder,
             hour = in_time_idx * HOURS
             print(f"\n  Time step {in_time_idx} → {hour:02d}h")
 
-            # Write valid time
-            netcdf_dict["valid_time_data"][0, out_time_idx] = date2num(
-                d + timedelta(hours=int(valid_times[out_time_idx])),
-                units="hours since 1900-01-01 00:00:00.0"
-            )
+            # # Write valid time
+            # netcdf_dict["valid_time_data"][0, out_time_idx] = date2num(
+            #     d + timedelta(hours=int(valid_times[out_time_idx])),
+            #     units="hours since 1900-01-01 00:00:00.0"
+            # )
 
             field_arrays = []
 
@@ -460,17 +460,17 @@ def make_fcst(input_folder=input_folder, output_folder=output_folder,
                     denormalise(gan_prediction[0, :, :, 0])
                 progbar.add(1)
 
-        # Close local file
-        netcdf_dict["rootgrp"].close()
-        print(f"\n  Local file written: {nc_out_path_local}")
+        # # Close local file
+        # netcdf_dict["rootgrp"].close()
+        # print(f"\n  Local file written: {nc_out_path_local}")
 
-        # Copy from local to Google Drive
-        shutil.copy(nc_out_path_local, nc_out_path_drive)
-        print(f"  Copied to Drive: {nc_out_path_drive}")
+        # # Copy from local to Google Drive
+        # shutil.copy(nc_out_path_local, nc_out_path_drive)
+        # print(f"  Copied to Drive: {nc_out_path_drive}")
 
-        # Clean up local temp file
-        os.remove(nc_out_path_local)
-        print(f"  Local temp file removed")
+        # # Clean up local temp file
+        # os.remove(nc_out_path_local)
+        # print(f"  Local temp file removed")
 
 
 # =============================================================================
