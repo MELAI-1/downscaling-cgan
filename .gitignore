@@ -13,6 +13,7 @@ test-logs/
 *.png 
 *.eps
 *.npy
+
 system_tests/data/constants/
 system_tests/data/tfrecords/
 system_tests/data/tmp_model_test/
@@ -149,3 +150,8 @@ dmypy.json
 
 .DS_Store
 sync*.sh
+
+
+*.h5
+
+*.h5
