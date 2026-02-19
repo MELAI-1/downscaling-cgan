@@ -14,7 +14,7 @@ INPUT:
     end_hour: 54
 
 OUTPUT:
-    folder: "/home/melvin_aims_ac_za/notebooks/outputs/"
+    folder: "/outputs/"
     ensemble_members: 50
 
 Data:
