@@ -9,6 +9,7 @@
 
 import os
 import sys
+import shutil
 import pathlib
 import yaml
 import gcsfs
@@ -45,8 +46,8 @@ from datetime import datetime, timedelta
 
 # =============================================================================
 # GRID DEFINITION
-# =============================================================================
 # Use linspace instead of arange to avoid floating point instability
+# =============================================================================
 latitude  = np.linspace(-13.65, 24.65, 384)
 longitude = np.linspace(19.15,  54.25, 352)
 
@@ -89,15 +90,15 @@ with open(fcstyaml_path, "r") as f:
     except yaml.YAMLError as exc:
         print(f"Error parsing YAML file: {exc}")
 
-model_folder     = fcst_params["MODEL"]["folder"]
-checkpoint       = fcst_params["MODEL"]["checkpoint"]
-input_folder     = fcst_params["INPUT"]["folder"]
-dates            = fcst_params["INPUT"]["dates"]
-start_hour       = fcst_params["INPUT"]["start_hour"]
-end_hour         = fcst_params["INPUT"]["end_hour"]
-output_folder    = fcst_params["OUTPUT"]["folder"]
-ensemble_members = fcst_params["OUTPUT"]["ensemble_members"]
-config_path      = fcst_params["MODEL"]["config_path"]
+model_folder      = fcst_params["MODEL"]["folder"]
+checkpoint        = fcst_params["MODEL"]["checkpoint"]
+input_folder      = fcst_params["INPUT"]["folder"]
+dates             = fcst_params["INPUT"]["dates"]
+start_hour        = fcst_params["INPUT"]["start_hour"]
+end_hour          = fcst_params["INPUT"]["end_hour"]
+output_folder     = fcst_params["OUTPUT"]["folder"]
+ensemble_members  = fcst_params["OUTPUT"]["ensemble_members"]
+config_path       = fcst_params["MODEL"]["config_path"]
 MODEL_CONFIG_PATH = config_path
 DATA_CONFIG_PATH  = fcst_params["Data"]["data_path"]
 
@@ -189,6 +190,12 @@ network_const_input = load_hires_constants(
 # =============================================================================
 def create_output_file(nc_out_path):
     """Create the output NetCDF file and return a dict of its variables."""
+
+    # Delete file if it already exists to avoid HDF lock error
+    if os.path.exists(nc_out_path):
+        os.remove(nc_out_path)
+        print(f"  → Removed existing file: {nc_out_path}")
+
     netcdf_dict = {}
     rootgrp = nc.Dataset(nc_out_path, "w", format="NETCDF4")
     netcdf_dict["rootgrp"] = rootgrp
@@ -262,7 +269,7 @@ def load_and_interpolate_field(field, d, in_time_idx, input_folder_year,
 
     # Group A: all time steps in one file → always load the 00h file
     # Group B: one file per time step → use the correct hour
-    file_hour  = 0    if field in GROUP_A else hour
+    file_hour  = 0 if field in GROUP_A else hour
     input_file = (
         f"{field}_{d.year}_ngcm_{field}_2.8deg_6h_GHA"
         f"_{d.strftime('%Y%m%d')}_{file_hour:02d}h.nc"
@@ -350,14 +357,22 @@ def make_fcst(input_folder=input_folder, output_folder=output_folder,
 
         input_folder_year = os.path.join(input_folder, str(d.year))
 
-        # Create output folder and file
+        # Final output path on Drive
         output_folder_year = os.path.join(output_folder, "test", str(d.year))
         pathlib.Path(output_folder_year).mkdir(parents=True, exist_ok=True)
-        nc_out_path = os.path.join(
+        nc_out_path_drive = os.path.join(
             output_folder_year, f"GAN_{d.year}{d.month:02}{d.day:02}.nc"
         )
 
-        netcdf_dict = create_output_file(nc_out_path)
+        # Local temp path — avoids HDF error when writing directly to Drive
+        local_tmp_dir = f"/content/tmp_output/test/{d.year}/"
+        pathlib.Path(local_tmp_dir).mkdir(parents=True, exist_ok=True)
+        nc_out_path_local = os.path.join(
+            local_tmp_dir, f"GAN_{d.year}{d.month:02}{d.day:02}.nc"
+        )
+
+        # Write NetCDF to local path
+        netcdf_dict = create_output_file(nc_out_path_local)
         netcdf_dict["time_data"][0] = date2num(
             d, units="hours since 1900-01-01 00:00:00.0"
         )
@@ -390,7 +405,6 @@ def make_fcst(input_folder=input_folder, output_folder=output_folder,
                     target_lat=latitude,
                     target_lon=longitude
                 )
-                # data shape: (384, 352) or (352, 384) → verified on first call
 
                 # Clip negative values for non-negative fields
                 if field in nonnegative_fields:
@@ -436,7 +450,6 @@ def make_fcst(input_folder=input_folder, output_folder=output_folder,
 
             # -----------------------------------------------------------------
             # Generate ensemble members via GAN
-            # The ensemble is produced here by the GAN itself through noise_gen()
             # Each call to noise_gen() produces a different noise → different member
             # -----------------------------------------------------------------
             progbar = Progbar(ensemble_members)
@@ -447,8 +460,17 @@ def make_fcst(input_folder=input_folder, output_folder=output_folder,
                     denormalise(gan_prediction[0, :, :, 0])
                 progbar.add(1)
 
+        # Close local file
         netcdf_dict["rootgrp"].close()
-        print(f"\n  Output saved: {nc_out_path}")
+        print(f"\n  Local file written: {nc_out_path_local}")
+
+        # Copy from local to Google Drive
+        shutil.copy(nc_out_path_local, nc_out_path_drive)
+        print(f"  Copied to Drive: {nc_out_path_drive}")
+
+        # Clean up local temp file
+        os.remove(nc_out_path_local)
+        print(f"  Local temp file removed")
 
 
 # =============================================================================
