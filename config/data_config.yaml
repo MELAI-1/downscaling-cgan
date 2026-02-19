@@ -121,8 +121,8 @@ paths:
       ERA5: '/content/drive/MyDrive/AIMS_project_data/ERA-5/day'
       IFS: '/content/drive/MyDrive/AIMS_project_data/IFS'
       # Local constant paths within the Colab repo
-      OROGRAPHY: '/content/downscaling-cgan/notebooks/constants/elev.nc'
-      LSM: '/content/downscaling-cgan/notebooks/constants/lsm.nc'
+      OROGRAPHY: '/content/drive/MyDrive/AIMS_project_data/constants/elev.nc'
+      LSM: '/content/drive/MyDrive/AIMS_project_data/constants/lsm.nc'
       LAKES: '/content/drive/MyDrive/AIMS_project_data/constants/lake_mask.nc'
       SEA: '/content/drive/MyDrive/AIMS_project_data/constants/sea_mask.nc'
       CONSTANTS: '/content/downscaling-cgan/notebooks/constants/'
