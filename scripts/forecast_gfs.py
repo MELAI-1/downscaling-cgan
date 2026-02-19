@@ -274,7 +274,7 @@ def load_and_interpolate_field(field, d, in_time_idx, input_folder_year,
         f"{field}_{d.year}_ngcm_{field}_2.8deg_6h_GHA"
         f"_{d.strftime('%Y%m%d')}_{file_hour:02d}h.nc"
     )
-    nc_in_path = os.path.join(input_folder_year, field, str(d.year), input_file)
+    nc_in_path = os.path.join(field, str(d.year), input_file)
 
     if not os.path.exists(nc_in_path):
         raise FileNotFoundError(
