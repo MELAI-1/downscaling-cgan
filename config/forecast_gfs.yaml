@@ -8,7 +8,7 @@ MODEL:
     
 
 INPUT:
-    folder: "gs://melvin_aims_bucket/NCGM/" #the place where the NGCM data are
+    folder: "/content/drive/MyDrive/AIMS_project_data/NGCM/" #the place where the NGCM data are
     dates: ["2018-01-01"]
     start_hour: 30
     end_hour: 54
