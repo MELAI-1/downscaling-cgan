@@ -117,31 +117,33 @@ ngcm_input_normalisation_strategy:
 paths:
   BLUE_PEBBLE:
     GENERAL:
-      IMERG: '/home/melvin_aims_ac_za/data/IMERG'
-      ERA5: '/bp1/geog-tropical/data/ERA-5/day'
-      IFS: '/bp1/geog-tropical/users/uz22147/east_africa_data/IFS'
-      OROGRAPHY: '/home/melvin_aims_ac_za/data/constants/elev.nc'
-      LSM: '/home/melvin_aims_ac_za/data/constants/lsm.nc'
-      LAKES: '/bp1/geog-tropical/users/uz22147/east_africa_data/constants/lake_mask.nc'
-      SEA: '/bp1/geog-tropical/users/uz22147/east_africa_data/constants/sea_mask.nc'
-      CONSTANTS: '/home/melvin_aims_ac_za/data/constants/'
-      NGCM: '/home/melvin_aims_ac_za/data/NGCM/'
-      STATS: '/home/melvin_aims_ac_za/data/constants/neuralgcm_Horn_Africa_2018_stats.pkl'
+      IMERG: '/content/drive/MyDrive/AIMS_project_data/IMERG'
+      ERA5: '/content/drive/MyDrive/AIMS_project_data/ERA-5/day'
+      IFS: '/content/drive/MyDrive/AIMS_project_data/IFS'
+      # Local constant paths within the Colab repo
+      OROGRAPHY: '/content/downscaling-cgan/notebooks/constants/elev.nc'
+      LSM: '/content/downscaling-cgan/notebooks/constants/lsm.nc'
+      LAKES: '/content/drive/MyDrive/AIMS_project_data/constants/lake_mask.nc'
+      SEA: '/content/drive/MyDrive/AIMS_project_data/constants/sea_mask.nc'
+      CONSTANTS: '/content/downscaling-cgan/notebooks/constants/'
+      NGCM: '/content/drive/MyDrive/AIMS_project_data/NGCM/'
+      STATS: '/content/downscaling-cgan/notebooks/constants/neuralgcm_Horn_Africa_2018_stats.pkl'
 
     NGCM:
-      evaporation: '/home/melvin_aims_ac_za/data/NGCM/evaporation'
-      precipitation_cumulative_mean: '/home/melvin_aims_ac_za/data/NGCM/precipitation_cumulative_mean'
-      specific_cloud_ice_water_content_500: '/home/melvin_aims_ac_za/data/NGCM/specific_cloud_ice_water_content_500'
-      specific_cloud_ice_water_content_700: '/home/melvin_aims_ac_za/data/NGCM/specific_cloud_ice_water_content_700'
-      specific_cloud_ice_water_content_850: '/home/melvin_aims_ac_za/data/NGCM/specific_cloud_ice_water_content_850'
-      u_component_of_wind_500: '/home/melvin_aims_ac_za/data/NGCM/u_component_of_wind_500'
-      u_component_of_wind_700: '/home/melvin_aims_ac_za/data/NGCM/u_component_of_wind_700'
-      u_component_of_wind_850: '/home/melvin_aims_ac_za/data/NGCM/u_component_of_wind_850'
-      v_component_of_wind_500: '/home/melvin_aims_ac_za/data/NGCM/v_component_of_wind_500'
-      v_component_of_wind_700: '/home/melvin_aims_ac_za/data/NGCM/v_component_of_wind_700'
-      v_component_of_wind_850: '/home/melvin_aims_ac_za/data/NGCM/v_component_of_wind_850'
+      # Specific sub-folders within the NGCM directory
+      evaporation: '/content/drive/MyDrive/AIMS_project_data/NGCM/evaporation'
+      precipitation_cumulative_mean: '/content/drive/MyDrive/AIMS_project_data/NGCM/precipitation_cumulative_mean'
+      specific_cloud_ice_water_content_500: '/content/drive/MyDrive/AIMS_project_data/NGCM/specific_cloud_ice_water_content_500'
+      specific_cloud_ice_water_content_700: '/content/drive/MyDrive/AIMS_project_data/NGCM/specific_cloud_ice_water_content_700'
+      specific_cloud_ice_water_content_850: '/content/drive/MyDrive/AIMS_project_data/NGCM/specific_cloud_ice_water_content_850'
+      u_component_of_wind_500: '/content/drive/MyDrive/AIMS_project_data/NGCM/u_component_of_wind_500'
+      u_component_of_wind_700: '/content/drive/MyDrive/AIMS_project_data/NGCM/u_component_of_wind_700'
+      u_component_of_wind_850: '/content/drive/MyDrive/AIMS_project_data/NGCM/u_component_of_wind_850'
+      v_component_of_wind_500: '/content/drive/MyDrive/AIMS_project_data/NGCM/v_component_of_wind_500'
+      v_component_of_wind_700: '/content/drive/MyDrive/AIMS_project_data/NGCM/v_component_of_wind_700'
+      v_component_of_wind_850: '/content/drive/MyDrive/AIMS_project_data/NGCM/v_component_of_wind_850'
 
     TFRecords:
-      tfrecords_path: '/home/melvin_aims_ac_za/data/tfrecords/'
-
+      # Storing TFRecords on Drive to ensure persistence
+      tfrecords_path: '/content/drive/MyDrive/AIMS_project_data/tfrecords/'
 
