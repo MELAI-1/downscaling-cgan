@@ -6,6 +6,7 @@
 # A more robust version of this script would parse the latitudes, longitudes, and
 # forecast time info from the input file.
 # The forecast data fields must match those defined in data.all_ngcm_fields
+
 import os
 import sys
 import pathlib
@@ -19,7 +20,7 @@ import xarray as xr
 import numpy as np
 from tensorflow.keras.utils import Progbar
 
-sys.path.insert(1,"../")
+sys.path.insert(1, "../")
 from dsrnngan.data.data_gefs import (
     HOURS,
     all_ngcm_fields,
@@ -30,105 +31,84 @@ from dsrnngan.data.data_gefs import (
     load_hires_constants,
     load_ngcm_stats,
     interpolate_dataset_on_lat_lon,
-    constant_fields,
-    OROGRAPHY_PATH ,
+    OROGRAPHY_PATH,
     LSM_PATH
-    
 )
 
 from dsrnngan.utils.read_config import set_gpu_mode, get_data_paths
-from dsrnngan.model.setupmodel import load_model_from_folder,setup_model
+from dsrnngan.model.setupmodel import setup_model
 from dsrnngan.model.noise import NoiseGenerator
 import tensorflow as tf
-from dsrnngan.utils.read_config import read_model_config,read_data_config
+from dsrnngan.utils.read_config import read_model_config, read_data_config
 
 from datetime import datetime, timedelta
-from pathlib import Path
 
-# %%
-# Define the latitude and longitude arrays for later
-latitude = np.arange(-13.65,24.65+0.1,0.1)
-longitude = np.arange(19.15,54.25+0.1,0.1)
+# =============================================================================
+# GRID DEFINITION
+# =============================================================================
+# Use linspace instead of arange to avoid floating point instability
+latitude  = np.linspace(-13.65, 24.65, 384)
+longitude = np.linspace(19.15,  54.25, 352)
 
-# Some setup
-set_gpu_mode()  # set up whether to use GPU, and mem alloc mode
-data_paths = get_data_paths()  # need the constants directory
+# Group A: files contain all time steps in a single file (time dim = 37)
+GROUP_A = ['evaporation', 'precipitation_cumulative_mean']
 
-##🚩 hard code the dowscaling_steps and also the summary statistic
-downscaling_steps = [1]
+# Group B: one file per time step, no time dimension
+GROUP_B = [
+    'specific_cloud_ice_water_content_500',
+    'specific_cloud_ice_water_content_700',
+    'specific_cloud_ice_water_content_850',
+    'u_component_of_wind_500',
+    'u_component_of_wind_700',
+    'u_component_of_wind_850',
+    'v_component_of_wind_500',
+    'v_component_of_wind_700',
+    'v_component_of_wind_850'
+]
+
+# =============================================================================
+# SETUP
+# =============================================================================
+set_gpu_mode()
+data_paths = get_data_paths()
+
 fcst_norm = load_ngcm_stats()
-assert fcst_norm is not None
+assert fcst_norm is not None, "Could not load forecast normalisation stats"
 
+# =============================================================================
+# LOAD FORECAST YAML CONFIG
+# =============================================================================
+SCRIPT_DIR    = os.path.dirname(os.path.abspath(__file__))
+fcstyaml_path = os.path.normpath(
+    os.path.join(SCRIPT_DIR, "..", "config", "forecast_gfs.yaml")
+)
 
-# %%
-##🚩 setting of the models 
-# Open and parse forecast.yaml
-
-SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-fcstyaml_path = os.path.join(SCRIPT_DIR, "..", "config", "forecast_gfs.yaml")
-fcstyaml_path = os.path.normpath(fcstyaml_path)
-
-# Open and parse forecast.yaml
 with open(fcstyaml_path, "r") as f:
     try:
         fcst_params = yaml.safe_load(f)
     except yaml.YAMLError as exc:
         print(f"Error parsing YAML file: {exc}")
 
-# # %%
-model_folder = fcst_params["MODEL"]["folder"]
-checkpoint = fcst_params["MODEL"]["checkpoint"]
-input_folder = fcst_params["INPUT"]["folder"]
-dates = fcst_params["INPUT"]["dates"]
-start_hour = fcst_params["INPUT"]["start_hour"]
-end_hour = fcst_params["INPUT"]["end_hour"]
-output_folder = fcst_params["OUTPUT"]["folder"]
+model_folder     = fcst_params["MODEL"]["folder"]
+checkpoint       = fcst_params["MODEL"]["checkpoint"]
+input_folder     = fcst_params["INPUT"]["folder"]
+dates            = fcst_params["INPUT"]["dates"]
+start_hour       = fcst_params["INPUT"]["start_hour"]
+end_hour         = fcst_params["INPUT"]["end_hour"]
+output_folder    = fcst_params["OUTPUT"]["folder"]
 ensemble_members = fcst_params["OUTPUT"]["ensemble_members"]
-config_path = fcst_params["MODEL"]["config_path"]
-
-assert start_hour % HOURS == 0, f"start_hour must be divisible by {HOURS}"
-assert end_hour % HOURS == 0, f"end_hour must be divisible by {HOURS}"
-
-# Open and parse GAN config file
-##🚩 please don't forget to make sure the yaml file model_config.yaml is as the correct path with the correct parameters 
-# config_path = os.path.join(model_folder, "model_config.yaml")
-
-
-# Connect to GCS
-fs = gcsfs.GCSFileSystem()
-
-# Open the file using gcsfs
-with fs.open(config_path, "r") as f:
-    setup_params = yaml.safe_load(f)
-
-print(setup_params)  # verify contents
-
-mode = setup_params["mode"]
-arch = setup_params["architecture"]
-padding = setup_params["padding"]
-filters_gen = setup_params["generator"]["filters_gen"]
-noise_channels = setup_params["generator"]["noise_channels"]
-latent_variables = setup_params["generator"]["latent_variables"]
-filters_disc = setup_params["discriminator"]["filters_disc"]  # TODO: avoid setting up discriminator in forecast mode?
-
-# assert mode == "GAN", "standalone forecast script only for GAN, not VAE-GAN or deterministic model"
-
-# Set up pre-trained GAN
-weights_fn = os.path.join(model_folder, "models", f"gen_weights-{checkpoint:07}.h5")
-# input_channels = 4*len(all_ngcm_fields)
-input_channels = len(all_ngcm_fields)
-
-
-##🚩define the path of the configuration after the training 
-#define the config 
-MODEL_CONFIG_PATH = config_path 
+config_path      = fcst_params["MODEL"]["config_path"]
+MODEL_CONFIG_PATH = config_path
 DATA_CONFIG_PATH  = fcst_params["Data"]["data_path"]
 
+assert start_hour % HOURS == 0, f"start_hour must be divisible by {HOURS}"
+assert end_hour   % HOURS == 0, f"end_hour must be divisible by {HOURS}"
 
+# =============================================================================
+# LOAD MODEL AND GAN CONFIGS
+# =============================================================================
 def load_yaml(path: str):
-    """
-    Load a YAML file from local filesystem or GCS.
-    """
+    """Load a YAML file from local filesystem or GCS."""
     if path.startswith("gs://"):
         fs = gcsfs.GCSFileSystem()
         if not fs.exists(path):
@@ -136,241 +116,343 @@ def load_yaml(path: str):
         with fs.open(path, "r") as f:
             return yaml.safe_load(f)
     else:
-        path = Path(path)
-        if not path.exists():
+        p = Path(path)
+        if not p.exists():
             raise FileNotFoundError(f"{path} not found locally")
-        with open(path, "r") as f:
+        with open(p, "r") as f:
             return yaml.safe_load(f)
 
 
-# Load YAML from GCS
+# Connect to GCS and load setup params
+fs = gcsfs.GCSFileSystem()
+with fs.open(config_path, "r") as f:
+    setup_params = yaml.safe_load(f)
+print(setup_params)
+
+mode             = setup_params["mode"]
+arch             = setup_params["architecture"]
+padding          = setup_params["padding"]
+filters_gen      = setup_params["generator"]["filters_gen"]
+noise_channels   = setup_params["generator"]["noise_channels"]
+latent_variables = setup_params["generator"]["latent_variables"]
+filters_disc     = setup_params["discriminator"]["filters_disc"]
+
+# 1 channel per field — no ensemble in input data
+input_channels = len(all_ngcm_fields)  # = 11
+
+# Load model and data configs
 model_cfg_dict = load_yaml(MODEL_CONFIG_PATH)
 data_cfg_dict  = load_yaml(DATA_CONFIG_PATH)
 
-# Parse configs
 model_config = read_model_config(model_config_dict=model_cfg_dict)
 data_config  = read_data_config(data_config_dict=data_cfg_dict)
 
-
-# Setup model
+# =============================================================================
+# SETUP GAN MODEL AND LOAD WEIGHTS
+# =============================================================================
 model = setup_model(
     model_config=model_config,
     data_config=data_config
 )
-# Load weights
 gen = model.gen
-# gen.load_weights(weights_fn)
-##🚩load the weight for a specific gen
+
 
 def get_weights_path(params, repo_name="downscaling-cgan"):
-    
-    base_path = Path(f"/content/{repo_name}") 
-    checkpoint = params['MODEL']['checkpoint']
-    rel_path = params['MODEL'].get('local_weights_dir', 'notebooks/models')
+    """Build the path to the generator weights file."""
+    base_path   = Path(f"/content/{repo_name}")
+    checkpoint  = params['MODEL']['checkpoint']
+    rel_path    = params['MODEL'].get('local_weights_dir', 'notebooks/models')
     weight_file = f"gen_weights-{checkpoint:07d}.h5"
-    full_path = base_path / rel_path / weight_file
-    
+    full_path   = base_path / rel_path / weight_file
     if not full_path.exists():
         raise FileNotFoundError(f"Weights not found at: {full_path}")
-        
     return str(full_path)
 
+
 weights_fn = get_weights_path(fcst_params)
-print(f" Model weights localized: {weights_fn}")
+print(f"Model weights localized: {weights_fn}")
 gen.load_weights(weights_fn)
-print(f" Model well loaded")
+print(f"Model successfully loaded")
 
+# =============================================================================
+# LOAD CONSTANT FIELDS (orography + land-sea mask)
+# =============================================================================
+data_paths = {"LSM": LSM_PATH, "OROGRAPHY": OROGRAPHY_PATH}
+network_const_input = load_hires_constants(
+    batch_size=1,
+    fields=["orography", "lsm"],
+    data_paths=data_paths
+)  # shape: 1 x lats x lons x 2
 
-##🚩 Load the model directly by given the  folder  and the checkpoint 
-##🚩 Note: for this you need  to make sure everything is well pass in the load_model_from_folder function in the setupmodel module
-# gen= load_model_from_folder(model_folder=fcst_params["MODEL"]["folder"],
-#                              model_number=fcst_params["MODEL"]["checkpoint"])
-
-
-#add the path of the constant
-data_paths={"LSM":LSM_PATH,
-            "OROGRAPHY": OROGRAPHY_PATH}
-
-network_const_input = load_hires_constants(batch_size=1,fields=["orography","lsm"],data_paths=data_paths)  # 1 x lats x lons x 2
-# %%
-
-
-##🚩Please what are the parameters I need to update here ?
+# =============================================================================
+# OUTPUT FILE CREATION
+# =============================================================================
 def create_output_file(nc_out_path):
+    """Create the output NetCDF file and return a dict of its variables."""
     netcdf_dict = {}
     rootgrp = nc.Dataset(nc_out_path, "w", format="NETCDF4")
     netcdf_dict["rootgrp"] = rootgrp
     rootgrp.description = "GAN 6-hour rainfall ensemble members in the ICPAC region."
 
-    # Create output file dimensions
-    rootgrp.createDimension("latitude", len(latitude))
-    rootgrp.createDimension("longitude", len(longitude))
-    rootgrp.createDimension("member", ensemble_members)
-    rootgrp.createDimension("time", None)
+    # Dimensions
+    rootgrp.createDimension("latitude",   len(latitude))
+    rootgrp.createDimension("longitude",  len(longitude))
+    rootgrp.createDimension("member",     ensemble_members)
+    rootgrp.createDimension("time",       None)
     rootgrp.createDimension("valid_time", None)
 
-    # Create variables
-    latitude_data = rootgrp.createVariable("latitude",
-                                           "f4",
-                                           ("latitude",))
+    # Coordinate variables
+    latitude_data = rootgrp.createVariable("latitude", "f4", ("latitude",))
     latitude_data.units = "degrees_north"
-    
-    print(f"Target dimension size: {len(latitude_data)}")
-    print(f"Source data shape: {latitude.shape}")
-    latitude_data[:] = latitude     # Write the latitude data
+    latitude_data[:] = latitude
 
-    longitude_data = rootgrp.createVariable("longitude",
-                                            "f4",
-                                            ("longitude",))
+    longitude_data = rootgrp.createVariable("longitude", "f4", ("longitude",))
     longitude_data.units = "degrees_east"
-    longitude_data[:] = longitude   # Write the longitude data
+    longitude_data[:] = longitude
 
-    ensemble_data = rootgrp.createVariable("member",
-                                           "i4",
-                                           ("member",))
+    ensemble_data = rootgrp.createVariable("member", "i4", ("member",))
     ensemble_data.units = "ensemble member"
-    ensemble_data[:] = range(1, ensemble_members+1)
+    ensemble_data[:] = range(1, ensemble_members + 1)
 
-    netcdf_dict["time_data"] = rootgrp.createVariable("time",
-                                                      "f4",
-                                                      ("time",))
+    netcdf_dict["time_data"] = rootgrp.createVariable("time", "f4", ("time",))
     netcdf_dict["time_data"].units = "hours since 1900-01-01 00:00:00.0"
 
-    netcdf_dict["valid_time_data"] = rootgrp.createVariable("fcst_valid_time",
-                                                            "f4",
-                                                            ("time", "valid_time"))
+    netcdf_dict["valid_time_data"] = rootgrp.createVariable(
+        "fcst_valid_time", "f4", ("time", "valid_time")
+    )
     netcdf_dict["valid_time_data"].units = "hours since 1900-01-01 00:00:00.0"
 
-    netcdf_dict["precipitation"] = rootgrp.createVariable("precipitation",
-                                                          "f4",
-                                                          ("time", "member", "valid_time",
-                                                           "latitude", "longitude"),
-                                                          compression="zlib",
-                                                          chunksizes=(1, 1, 1, len(latitude), len(longitude)))
-    netcdf_dict["precipitation"].units = "mm h**-1"
+    netcdf_dict["precipitation"] = rootgrp.createVariable(
+        "precipitation", "f4",
+        ("time", "member", "valid_time", "latitude", "longitude"),
+        compression="zlib",
+        chunksizes=(1, 1, 1, len(latitude), len(longitude))
+    )
+    netcdf_dict["precipitation"].units     = "mm h**-1"
     netcdf_dict["precipitation"].long_name = "Precipitation"
 
     return netcdf_dict
 
-# %%
-def make_fcst(input_folder=input_folder, output_folder=output_folder,
-              dates=dates,start_hour=start_hour,end_hour=end_hour,HOURS=HOURS,
-              all_fst_fields=all_ngcm_fields,nonnegative_fields=nonnegative_fields,
-              gen=gen,ensemble_members=ensemble_members):
-    dates = np.asarray(dates,dtype='datetime64[ns]')
-    valid_times = np.arange(start_hour,end_hour+1,HOURS)
-    for day in dates:
-        d = datetime(day.astype('datetime64[D]').astype(object).year,
-                     day.astype('datetime64[D]').astype(object).month,
-                     day.astype('datetime64[D]').astype(object).day)
-                    
-        print(f"{d.year}-{d.month:02}-{d.day:02}")
-        
-        # %%
-        # Specify input folder for year
-        input_folder_year = input_folder+f"{d.year}/"
-        
-        ##🚩
-        print(input_folder_year)
-        
-        # Create output netCDF file
-        output_folder_year = output_folder+f"test/{d.year}/"
-        pathlib.Path(output_folder_year).mkdir(parents=True, exist_ok=True)
-        nc_out_path = os.path.join(output_folder_year, f"GAN_{d.year}{d.month:02}{d.day:02}.nc")
 
-       
+# =============================================================================
+# FIELD LOADING AND INTERPOLATION
+# =============================================================================
+def load_and_interpolate_field(field, d, in_time_idx, input_folder_year,
+                                target_lat, target_lon):
+    """
+    Load a NGCM field for a given day and time step,
+    then interpolate it onto the GAN model target grid.
+
+    Parameters:
+    -----------
+    field             : field name (e.g. 'evaporation', 'u_component_of_wind_500')
+    d                 : datetime of the day (e.g. datetime(2018, 1, 1))
+    in_time_idx       : time step index (0→00h, 1→06h, 2→12h ...)
+    input_folder_year : root folder for the year (e.g. '.../NGCM/2018/')
+    target_lat        : target latitude array  (384,)
+    target_lon        : target longitude array (352,)
+
+    Returns:
+    --------
+    data_interp : numpy array of shape (384, 352)
+    """
+
+    # --- Step 1: build the file path ---
+    hour = in_time_idx * HOURS  # 0→00h, 1→06h, 2→12h ...
+
+    # Group A: all time steps in one file → always load the 00h file
+    # Group B: one file per time step → use the correct hour
+    file_hour  = 0    if field in GROUP_A else hour
+    input_file = (
+        f"{field}_{d.year}_ngcm_{field}_2.8deg_6h_GHA"
+        f"_{d.strftime('%Y%m%d')}_{file_hour:02d}h.nc"
+    )
+    nc_in_path = os.path.join(input_folder_year, field, str(d.year), input_file)
+
+    if not os.path.exists(nc_in_path):
+        raise FileNotFoundError(
+            f"File not found for field='{field}', "
+            f"date={d.strftime('%Y%m%d')}, hour={file_hour:02d}h\n"
+            f"Path attempted: {nc_in_path}"
+        )
+    print(f"  → Loading: {nc_in_path}")
+
+    # --- Step 2: open the file ---
+    nc_file    = xr.open_dataset(nc_in_path, decode_timedelta=False)
+    short_name = [v for v in nc_file.data_vars][0]
+    data       = nc_file[short_name]
+
+    # --- Step 3: extract data according to group ---
+    if field in GROUP_A:
+        # time dimension has 37 steps → select the correct one
+        data = data.isel(time=in_time_idx)
+        # remove surface dimension if present
+        if 'surface' in data.dims:
+            data = data.squeeze("surface")
+    # Group B: already shape (longitude: 16, latitude: 18), nothing to do
+
+    # convert to numpy and verify shape
+    data = data.values  # (16, 18)
+    assert data.ndim == 2, (
+        f"Unexpected shape for '{field}': {data.shape}, "
+        f"expected 2D (longitude, latitude)"
+    )
+
+    # --- Step 4: check for missing values ---
+    if np.all(np.isnan(data)):
+        raise ValueError(
+            f"All values are NaN for field='{field}', "
+            f"date={d.strftime('%Y%m%d')}, hour={hour:02d}h"
+        )
+
+    # --- Step 5: interpolate onto the target grid ---
+    da = xr.DataArray(
+        data,
+        dims=["longitude", "latitude"],
+        coords={
+            "longitude": nc_file.longitude.values,  # (16,): 16.88 ... 59.06
+            "latitude":  nc_file.latitude.values     # (18,): -18.14 ... 29.3
+        }
+    )
+    data_interp = da.interp(
+        latitude=target_lat,   # (384,)
+        longitude=target_lon,  # (352,)
+        method="linear"
+    ).values  # shape (352, 384) or (384, 352) → verified on first call
+
+    print(f"  → Shape after interpolation: {data_interp.shape}")
+
+    nc_file.close()
+    return data_interp
+
+
+# =============================================================================
+# MAIN FORECAST FUNCTION
+# =============================================================================
+def make_fcst(input_folder=input_folder, output_folder=output_folder,
+              dates=dates, start_hour=start_hour, end_hour=end_hour,
+              HOURS=HOURS, all_fst_fields=all_ngcm_fields,
+              nonnegative_fields=nonnegative_fields,
+              gen=gen, ensemble_members=ensemble_members):
+
+    dates       = np.asarray(dates, dtype='datetime64[ns]')
+    valid_times = np.arange(start_hour, end_hour + 1, HOURS)
+
+    for day in dates:
+        d = datetime(
+            day.astype('datetime64[D]').astype(object).year,
+            day.astype('datetime64[D]').astype(object).month,
+            day.astype('datetime64[D]').astype(object).day
+        )
+        print(f"\n{'='*60}")
+        print(f"Processing date: {d.year}-{d.month:02}-{d.day:02}")
+        print(f"{'='*60}")
+
+        input_folder_year = os.path.join(input_folder, str(d.year))
+
+        # Create output folder and file
+        output_folder_year = os.path.join(output_folder, "test", str(d.year))
+        pathlib.Path(output_folder_year).mkdir(parents=True, exist_ok=True)
+        nc_out_path = os.path.join(
+            output_folder_year, f"GAN_{d.year}{d.month:02}{d.day:02}.nc"
+        )
+
         netcdf_dict = create_output_file(nc_out_path)
-        netcdf_dict["time_data"][0] = [date2num(d,units="hours since 1900-01-01 00:00:00.0")]
-         ##🚩
-        print(netcdf_dict)
-        # loop over time chunks. output forecasts may not start from hour 0, so
-        # generate output and input valid time indices using enumerate(...)
-        for out_time_idx, in_time_idx in enumerate(range(start_hour//HOURS, end_hour//HOURS)):
-            # copy across valid_time from input file
-            netcdf_dict["valid_time_data"][0, out_time_idx] = date2num(d+timedelta(hours=int(valid_times[out_time_idx])),
-                                                                          units="hours since 1900-01-01 00:00:00.0")
-            d_valid = d+ timedelta(hours=int(in_time_idx*HOURS))
-            day_idx=(int(in_time_idx*HOURS)//24)-1
-    
+        netcdf_dict["time_data"][0] = date2num(
+            d, units="hours since 1900-01-01 00:00:00.0"
+        )
+
+        for out_time_idx, in_time_idx in enumerate(
+            range(start_hour // HOURS, end_hour // HOURS)
+        ):
+            hour = in_time_idx * HOURS
+            print(f"\n  Time step {in_time_idx} → {hour:02d}h")
+
+            # Write valid time
+            netcdf_dict["valid_time_data"][0, out_time_idx] = date2num(
+                d + timedelta(hours=int(valid_times[out_time_idx])),
+                units="hours since 1900-01-01 00:00:00.0"
+            )
+
             field_arrays = []
-        
-            # the contents of the next loop are v. similar to load_fcst from data.py,
-            # but not quite the same, since that has different assumptions on how the
-            # forecast data is stored.  TODO: unify the data normalisation between these?
+
+            # -----------------------------------------------------------------
+            # Loop over all input fields
+            # -----------------------------------------------------------------
             for field in all_ngcm_fields:
-                # Original:
-                # nc_in[field] has shape 1 x 5 x 29 x 384 x 352
-                # corresponding to n_forecasts x n_ensemble_members x n_valid_times x n_lats x n_lons
-                # Ensemble mean:
-                # nc_in[field] has shape len(nc_in["time"]) x 29 x 384 x 352
-                
-                # Open input netCDF file
-                # input_file = f"{field}_{d.year}.nc"
-                #I have to update this part 
-                
-                input_file=f"{field}_{d.year}_ngcm_{field}_2.8deg_6h_GHA_{loaddate.strftime('%Y%m%d')}_{loadtime:02d}h.nc"
-                print(input_file)
-                nc_in_path = os.path.join(input_folder_year, input_file)
-                print(f"The final path: {nc_in_path}")
-                nc_file = xr.open_dataset(nc_in_path,engine='h5netcdf')
-                nc_file = nc_file.sel(
-            {"time":day}).isel({"step":[in_time_idx-5,in_time_idx-4]}
+
+                # Load and interpolate field onto model grid
+                data = load_and_interpolate_field(
+                    field=field,
+                    d=d,
+                    in_time_idx=in_time_idx,
+                    input_folder_year=input_folder_year,
+                    target_lat=latitude,
+                    target_lon=longitude
                 )
-                short_name = [var for var in nc_file.data_vars][0]
-                data = np.moveaxis(np.squeeze(nc_file[short_name].values),0,-1)
-                data=tf.constant(data)
-                # data = tf.image.resize(data,[384,352]).numpy()
-                # data=interpolate_dataset_on_lat_lon(data,[])
-                                      
+                # data shape: (384, 352) or (352, 384) → verified on first call
+
+                # Clip negative values for non-negative fields
                 if field in nonnegative_fields:
                     data = np.maximum(data, 0.0)
-                
-                if field in ["apcp"]:
-                    data = np.log10(1+data)
-                    data_mean = np.moveaxis(np.nanmean(data,axis=-1),0,-1)
-                    data_std = np.moveaxis(np.nanstd(data,axis=-1),0,-1)
-                    data = np.concatenate([data_mean[...,[0]],data_std[...,[0]],
-                                          data_mean[...,[1]],data_std[...,[1]]],axis=-1)
-                if field in ["msl", "pres","tmp"]:
-                    # these are bounded well away from zero, so subtract mean from ens mean (but NOT from ens sd!)
-                    data -= fcst_norm[field]["mean"]
-                    data /= fcst_norm[field]["std"]
-                    data_mean = np.moveaxis(np.nanmean(data,axis=-1),0,-1)
-                    data_std = np.moveaxis(np.nanstd(data,axis=-1),0,-1)
-                    data = np.concatenate([data_mean[...,[0]],data_std[...,[0]],
-                                          data_mean[...,[1]],data_std[...,[1]]],axis=-1)
-                elif field in nonnegative_fields:
-                    data /= fcst_norm[field]["max"]
-                    data_mean = np.moveaxis(np.nanmean(data,axis=-1),0,-1)
-                    data_std = np.moveaxis(np.nanstd(data,axis=-1),0,-1)
-                    data = np.concatenate([data_mean[...,[0]],data_std[...,[0]],
-                                          data_mean[...,[1]],data_std[...,[1]]],axis=-1)
-                elif field in ["ugrd","vgrd"]:
-                    data /= max(-fcst_norm[field]["min"], fcst_norm[field]["max"])
-                    data_mean = np.moveaxis(np.nanmean(data,axis=-1),0,-1)
-                    data_std = np.moveaxis(np.nanstd(data,axis=-1),0,-1)
-                    data = np.concatenate([data_mean[...,[0]],data_std[...,[0]],
-                                          data_mean[...,[1]],data_std[...,[1]]],axis=-1)
+
+                # Normalise according to field type
+                if field == 'precipitation_cumulative_mean':
+                    data = np.log10(1 + data)
+
+                elif field == 'evaporation':
+                    if fcst_norm[field]["max"] != 0:
+                        data = data / fcst_norm[field]["max"]
+
+                elif 'specific_cloud_ice_water_content' in field:
+                    if fcst_norm[field]["max"] != 0:
+                        data = data / fcst_norm[field]["max"]
+
+                elif 'u_component_of_wind' in field or 'v_component_of_wind' in field:
+                    norm_val = max(-fcst_norm[field]["min"], fcst_norm[field]["max"])
+                    if norm_val != 0:
+                        data = data / norm_val
+
+                # Add channel dimension → (384, 352, 1)
+                data = data[..., np.newaxis]
                 field_arrays.append(data)
-     
-            network_fcst_input = np.concatenate(field_arrays, axis=-1)  # lat x lon x 4*len(all_ngcm_fields)
-            print(network_fcst_input.shape)
-            network_fcst_input = np.expand_dims(network_fcst_input, axis=0)  # 1 x lat x lon x 4*len(...)
+
+            # -----------------------------------------------------------------
+            # Concatenate all fields → (384, 352, 11)
+            # -----------------------------------------------------------------
+            network_fcst_input = np.concatenate(field_arrays, axis=-1)
+            print(f"\n  network_fcst_input shape: {network_fcst_input.shape}")
+
+            # Add batch dimension → (1, 384, 352, 11)
+            network_fcst_input = np.expand_dims(network_fcst_input, axis=0)
+
+            # Build noise generator
             noise_shape = network_fcst_input.shape[1:-1] + (noise_channels,)
-            noise_gen = NoiseGenerator(noise_shape, batch_size=1)
-            
-            print(network_fcst_input.shape,network_const_input.shape,noise_gen().shape)
-            
+            noise_gen   = NoiseGenerator(noise_shape, batch_size=1)
+
+            print(f"  fcst input : {network_fcst_input.shape}")
+            print(f"  const input: {network_const_input.shape}")
+            print(f"  noise      : {noise_gen().shape}")
+
+            # -----------------------------------------------------------------
+            # Generate ensemble members via GAN
+            # The ensemble is produced here by the GAN itself through noise_gen()
+            # Each call to noise_gen() produces a different noise → different member
+            # -----------------------------------------------------------------
             progbar = Progbar(ensemble_members)
             for ii in range(ensemble_members):
-                gan_inputs = [network_fcst_input, network_const_input, noise_gen()]
+                gan_inputs     = [network_fcst_input, network_const_input, noise_gen()]
                 gan_prediction = gen.predict(gan_inputs, verbose=False)  # 1 x lat x lon x 1
-                netcdf_dict["precipitation"][0, ii, out_time_idx, :, :] = denormalise(gan_prediction[0, :, :, 0])
+                netcdf_dict["precipitation"][0, ii, out_time_idx, :, :] = \
+                    denormalise(gan_prediction[0, :, :, 0])
                 progbar.add(1)
-            
-        netcdf_dict["rootgrp"].close()
 
-if __name__=="__main__":
-    
+        netcdf_dict["rootgrp"].close()
+        print(f"\n  Output saved: {nc_out_path}")
+
+
+# =============================================================================
+# ENTRY POINT
+# =============================================================================
+if __name__ == "__main__":
     make_fcst()
-    
