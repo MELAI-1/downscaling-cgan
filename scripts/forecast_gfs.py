@@ -268,14 +268,19 @@ def make_fcst(input_folder=input_folder, output_folder=output_folder,
         # Specify input folder for year
         input_folder_year = input_folder+f"{d.year}/"
         
+        ##🚩
+        print(input_folder_year)
+        
         # Create output netCDF file
         output_folder_year = output_folder+f"test/{d.year}/"
         pathlib.Path(output_folder_year).mkdir(parents=True, exist_ok=True)
         nc_out_path = os.path.join(output_folder_year, f"GAN_{d.year}{d.month:02}{d.day:02}.nc")
-        
+
+       
         netcdf_dict = create_output_file(nc_out_path)
         netcdf_dict["time_data"][0] = [date2num(d,units="hours since 1900-01-01 00:00:00.0")]
-        
+         ##🚩
+        print(netcdf_dict)
         # loop over time chunks. output forecasts may not start from hour 0, so
         # generate output and input valid time indices using enumerate(...)
         for out_time_idx, in_time_idx in enumerate(range(start_hour//HOURS, end_hour//HOURS)):
@@ -302,8 +307,10 @@ def make_fcst(input_folder=input_folder, output_folder=output_folder,
                 #I have to update this part 
                 
                 input_file=f"{field}_{d.year}_ngcm_{field}_2.8deg_6h_GHA_{loaddate.strftime('%Y%m%d')}_{loadtime:02d}h.nc"
+                print(input_file)
                 nc_in_path = os.path.join(input_folder_year, input_file)
-                nc_file = xr.open_dataset(nc_in_path)
+                print(f"The final path: {nc_in_path}")
+                nc_file = xr.open_dataset(nc_in_path,engine='h5netcdf')
                 nc_file = nc_file.sel(
             {"time":day}).isel({"step":[in_time_idx-5,in_time_idx-4]}
                 )
