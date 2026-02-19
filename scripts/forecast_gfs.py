@@ -179,6 +179,7 @@ def get_weights_path(params, repo_name="downscaling-cgan"):
 weights_fn = get_weights_path(fcst_params)
 print(f" Model weights localized: {weights_fn}")
 gen.load_weights(weights_fn)
+print(f" Model well loaded")
 
 
 ##🚩 Load the model directly by given the  folder  and the checkpoint 
@@ -344,11 +345,13 @@ def make_fcst(input_folder=input_folder, output_folder=output_folder,
                 field_arrays.append(data)
      
             network_fcst_input = np.concatenate(field_arrays, axis=-1)  # lat x lon x 4*len(all_ngcm_fields)
+            print(network_fcst_input.shape))
             network_fcst_input = np.expand_dims(network_fcst_input, axis=0)  # 1 x lat x lon x 4*len(...)
             noise_shape = network_fcst_input.shape[1:-1] + (noise_channels,)
             noise_gen = NoiseGenerator(noise_shape, batch_size=1)
             
-            #print(network_fcst_input.shape,network_const_input.shape,noise_gen().shape)
+            print(network_fcst_input.shape,network_const_input.shape,noise_gen().shape)
+            
             progbar = Progbar(ensemble_members)
             for ii in range(ensemble_members):
                 gan_inputs = [network_fcst_input, network_const_input, noise_gen()]
