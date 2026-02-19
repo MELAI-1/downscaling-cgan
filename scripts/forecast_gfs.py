@@ -110,7 +110,6 @@ filters_gen = setup_params["generator"]["filters_gen"]
 noise_channels = setup_params["generator"]["noise_channels"]
 latent_variables = setup_params["generator"]["latent_variables"]
 filters_disc = setup_params["discriminator"]["filters_disc"]  # TODO: avoid setting up discriminator in forecast mode?
-constant_fields = 2
 
 # assert mode == "GAN", "standalone forecast script only for GAN, not VAE-GAN or deterministic model"
 
