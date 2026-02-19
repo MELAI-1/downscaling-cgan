@@ -215,6 +215,9 @@ def create_output_file(nc_out_path):
                                            "f4",
                                            ("latitude",))
     latitude_data.units = "degrees_north"
+    
+    print(f"Target dimension size: {len(latitude_data)}")
+    print(f"Source data shape: {latitude.shape}")
     latitude_data[:] = latitude     # Write the latitude data
 
     longitude_data = rootgrp.createVariable("longitude",
