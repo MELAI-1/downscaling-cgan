@@ -308,7 +308,7 @@ def load_and_interpolate_field(field, d, in_time_idx, input_folder_year,
 
     # --- Step 3: extract data according to group ---
     if field in GROUP_A:
-        data = data.squeeze("time")
+        data = data.isel(time=0)
         # remove 
         if 'surface' in data.dims:
             data = data.squeeze("surface")
@@ -371,7 +371,7 @@ def make_fcst(input_folder=input_folder, output_folder=output_folder,
         print(f"Processing date: {d.year}-{d.month:02}-{d.day:02}")
         print(f"{'='*60}")
 
-        input_folder_year = os.path.join(input_folder, str(d.year))
+        input_folder_year = input_folder
 
         # Final output path on Drive
         output_folder_year = os.path.join(output_folder, "test", str(d.year))
