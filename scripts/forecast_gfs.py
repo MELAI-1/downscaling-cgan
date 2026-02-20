@@ -187,77 +187,6 @@ network_const_input = load_hires_constants(
     data_paths=data_paths
 )  # shape: 1 x lats x lons x 2
 print(network_const_input)
-# =============================================================================
-# OUTPUT FILE CREATION
-# =============================================================================
-# def create_output_file(nc_out_path):
-#     """Create the output NetCDF file and return a dict of its variables."""
-
-#     # Delete file if it already exists to avoid HDF lock error
-#     if os.path.exists(nc_out_path):
-#         os.remove(nc_out_path)
-#         print(f"  → Removed existing file: {nc_out_path}")
-
-#     netcdf_dict = {}
-#     rootgrp = nc.Dataset(nc_out_path, "w", format="NETCDF4")
-#     netcdf_dict["rootgrp"] = rootgrp
-#     rootgrp.description = "GAN 6-hour rainfall ensemble members in the ICPAC region."
-
-#     # Dimensions
-#     rootgrp.createDimension("latitude",   len(latitude))
-#     rootgrp.createDimension("longitude",  len(longitude))
-#     rootgrp.createDimension("member",     ensemble_members)
-#     rootgrp.createDimension("time",       None)
-#     rootgrp.createDimension("valid_time", None)
-
-#     # Coordinate variables
-#     latitude_data = rootgrp.createVariable("latitude", "f4", ("latitude",))
-#     latitude_data.units = "degrees_north"
-#     latitude_data[:] = latitude
-
-#     longitude_data = rootgrp.createVariable("longitude", "f4", ("longitude",))
-#     longitude_data.units = "degrees_east"
-#     longitude_data[:] = longitude
-
-#     ensemble_data = rootgrp.createVariable("member", "i4", ("member",))
-#     ensemble_data.units = "ensemble member"
-#     ensemble_data[:] = range(1, ensemble_members + 1)
-
-#     netcdf_dict["time_data"] = rootgrp.createVariable("time", "f4", ("time",))
-#     netcdf_dict["time_data"].units = "hours since 1900-01-01 00:00:00.0"
-
-#     netcdf_dict["valid_time_data"] = rootgrp.createVariable(
-#         "fcst_valid_time", "f4", ("time", "valid_time")
-#     )
-#     netcdf_dict["valid_time_data"].units = "hours since 1900-01-01 00:00:00.0"
-
-#     netcdf_dict["precipitation"] = rootgrp.createVariable(
-#         "precipitation", "f4",
-#         ("time", "member", "valid_time", "latitude", "longitude"),
-#         compression="zlib",
-#         chunksizes=(1, 1, 1, len(latitude), len(longitude))
-#     )
-#     netcdf_dict["precipitation"].units     = "mm h**-1"
-#     netcdf_dict["precipitation"].long_name = "Precipitation"
-
-#     return netcdf_dict
-def create_output_file(n_times, n_members, n_valid_times, n_lat, n_lon):
-    """
-    Initializes a dictionary of NumPy arrays to store the forecast.
-    Note: We kept the name 'create_output_file' per your request, 
-    but it now creates a data structure in memory.
-    """
-    print(f"  → Initializing data structure: ({n_times}, {n_members}, {n_valid_times}, {n_lat}, {n_lon})")
-    
-    output_dict = {
-        "precipitation": np.zeros((n_times, n_members, n_valid_times, n_lat, n_lon), dtype=np.float32),
-        "time": np.zeros((n_times,), dtype=np.float32),
-        "fcst_valid_time": np.zeros((n_times, n_valid_times), dtype=np.float32),
-        "latitude": latitude,
-        "longitude": longitude
-    }
-    
-    return output_dict
 
 # =============================================================================
 # FIELD LOADING AND INTERPOLATION
@@ -283,19 +212,22 @@ def load_and_interpolate_field(field, d, in_time_idx, input_folder_year,
     """
 
     # --- Step 1: build the file path ---
-    hour = in_time_idx * HOURS  
+    hour = in_time_idx * HOURS
     print(f"beginnig hour:{hour}")
+
+  
+    file_hour = hour
 
     input_file = (
         f"{field}_{d.year}_ngcm_{field}_2.8deg_6h_GHA"
-        f"_{d.strftime('%Y%m%d')}_{hour:02d}h.nc"
+        f"_{d.strftime('%Y%m%d')}_{file_hour:02d}h.nc"
     )
     nc_in_path = os.path.join(input_folder_year, field, str(d.year), input_file)
 
     if not os.path.exists(nc_in_path):
         raise FileNotFoundError(
             f"File not found for field='{field}', "
-            f"date={d.strftime('%Y%m%d')}, hour={hour:02d}h\n"
+            f"date={d.strftime('%Y%m%d')}, hour={file_hour:02d}h\n"
             f"Path attempted: {nc_in_path}"
         )
     print(f"  → Loading: {nc_in_path}")
@@ -308,7 +240,7 @@ def load_and_interpolate_field(field, d, in_time_idx, input_folder_year,
     # --- Step 3: extract data according to group ---
     if field in GROUP_A:
         data = data.isel(time=0)
-        # remove 
+        # remove surface dimension if present
         if 'surface' in data.dims:
             data = data.squeeze("surface")
 
@@ -323,7 +255,7 @@ def load_and_interpolate_field(field, d, in_time_idx, input_folder_year,
     if np.all(np.isnan(data)):
         raise ValueError(
             f"All values are NaN for field='{field}', "
-            f"date={d.strftime('%Y%m%d')}, hour={hour:02d}h"
+            f"date={d.strftime('%Y%m%d')}, hour={file_hour:02d}h"
         )
 
     # --- Step 5: interpolate onto the target grid ---
@@ -339,7 +271,7 @@ def load_and_interpolate_field(field, d, in_time_idx, input_folder_year,
         latitude=target_lat,   # (384,)
         longitude=target_lon,  # (352,)
         method="linear"
-    ).transpose("latitude", "longitude").values  # shape (352, 384) or (384, 352) → verified on first call
+    ).transpose("latitude", "longitude").values  # shape (384, 352)
 
     print(f"  → Shape after interpolation: {data_interp.shape}")
 
@@ -375,34 +307,24 @@ def make_fcst(input_folder=input_folder, output_folder=output_folder,
         # Final output path on Drive
         output_folder_year = os.path.join(output_folder, "test", str(d.year))
         pathlib.Path(output_folder_year).mkdir(parents=True, exist_ok=True)
-        nc_out_path_drive = os.path.join(
-            output_folder_year, f"GAN_{d.year}{d.month:02}{d.day:02}.nc"
-        )
 
-        # Local temp path — avoids HDF error when writing directly to Drive
+        # Local temp path
         local_tmp_dir = f"/content/tmp_output/test/{d.year}/"
         pathlib.Path(local_tmp_dir).mkdir(parents=True, exist_ok=True)
-        nc_out_path_local = os.path.join(
-            local_tmp_dir, f"GAN_{d.year}{d.month:02}{d.day:02}.nc"
-        )
 
-        # # Write NetCDF to local path
-        # netcdf_dict = create_output_file(nc_out_path_local)
-        # netcdf_dict["time_data"][0] = date2num(
-        #     d, units="hours since 1900-01-01 00:00:00.0"
-        # )
+        # Pre-allocate numpy output array: (members, valid_times, lat, lon)
+        n_valid_times = len(range(start_hour // HOURS, (end_hour // HOURS) + 1))
+        precip_all = np.full(
+            (ensemble_members, n_valid_times, len(latitude), len(longitude)),
+            fill_value=np.nan,
+            dtype=np.float32
+        )
 
         for out_time_idx, in_time_idx in enumerate(
             range(start_hour // HOURS, (end_hour // HOURS)+1)
         ):
             hour = in_time_idx * HOURS
             print(f"\n  Time step {in_time_idx} → {hour:02d}h")
-
-            # # Write valid time
-            # netcdf_dict["valid_time_data"][0, out_time_idx] = date2num(
-            #     d + timedelta(hours=int(valid_times[out_time_idx])),
-            #     units="hours since 1900-01-01 00:00:00.0"
-            # )
 
             field_arrays = []
 
@@ -471,21 +393,43 @@ def make_fcst(input_folder=input_folder, output_folder=output_folder,
             for ii in range(ensemble_members):
                 gan_inputs     = [network_fcst_input, network_const_input, noise_gen()]
                 gan_prediction = gen.predict(gan_inputs, verbose=False)  # 1 x lat x lon x 1
-                # netcdf_dict["precipitation"][0, ii, out_time_idx, :, :] = \
-                #     denormalise(gan_prediction[0, :, :, 0])
+                print(f"GAN output RAW — min: {gan_prediction[0,:,:,0].min():.4f}, "
+      f"max: {gan_prediction[0,:,:,0].max():.4f}, "
+      f"mean: {gan_prediction[0,:,:,0].mean():.4f}")
+                precip_all[ii, out_time_idx, :, :] = \
+                    denormalise(gan_prediction[0, :, :, 0],normalisation_type='log').astype(np.float32)
                 progbar.add(1)
 
-        # # Close local file
-        # netcdf_dict["rootgrp"].close()
-        # print(f"\n  Local file written: {nc_out_path_local}")
+        # -----------------------------------------------------------------
+        # Save outputs as .npy files
+        # Reload with:
+        #   precip    = np.load("precipitation_20180101.npy")
+        #               → shape (members, valid_times, lat, lon)
+        #   latitude  = np.load("latitude.npy")
+        #   longitude = np.load("longitude.npy")
+        #   vtimes    = np.load("valid_times_20180101.npy")
+        #               → lead hours e.g. [0., 6., 12., 18., ...]
+        # -----------------------------------------------------------------
+        date_str = f"{d.year}{d.month:02}{d.day:02}"
 
-        # # Copy from local to Google Drive
-        # shutil.copy(nc_out_path_local, nc_out_path_drive)
-        # print(f"  Copied to Drive: {nc_out_path_drive}")
+        np.save(os.path.join(output_folder_year,
+                             f"precipitation_{date_str}.npy"),
+                precip_all)
 
-        # # Clean up local temp file
-        # os.remove(nc_out_path_local)
-        # print(f"  Local temp file removed")
+        np.save(os.path.join(output_folder_year, "latitude.npy"),
+                latitude.astype(np.float32))
+
+        np.save(os.path.join(output_folder_year, "longitude.npy"),
+                longitude.astype(np.float32))
+
+        np.save(os.path.join(output_folder_year,
+                             f"valid_times_{date_str}.npy"),
+                valid_times[:n_valid_times].astype(np.float32))
+
+        print(f"\n  Saved: precipitation_{date_str}.npy  "
+              f"shape={precip_all.shape}  "
+              f"(members={ensemble_members}, times={n_valid_times}, "
+              f"lat={len(latitude)}, lon={len(longitude)})")
 
 
 # =============================================================================
