@@ -321,7 +321,7 @@ def make_fcst(input_folder=input_folder, output_folder=output_folder,
         )
 
         for out_time_idx, in_time_idx in enumerate(
-            range(start_hour // HOURS, (end_hour // HOURS)+1)
+            range(start_hour // HOURS, (end_hour // HOURS))
         ):
             hour = in_time_idx * HOURS
             print(f"\n  Time step {in_time_idx} → {hour:02d}h")
