@@ -104,6 +104,8 @@ DATA_CONFIG_PATH  = fcst_params["Data"]["data_path"]
 
 assert start_hour % HOURS == 0, f"start_hour must be divisible by {HOURS}"
 assert end_hour   % HOURS == 0, f"end_hour must be divisible by {HOURS}"
+print(start_hour)
+print(HOURS)
 
 # =============================================================================
 # LOAD MODEL AND GAN CONFIGS
@@ -174,6 +176,7 @@ weights_fn = get_weights_path(fcst_params)
 print(f"Model weights localized: {weights_fn}")
 gen.load_weights(weights_fn)
 print(f"Model successfully loaded")
+print(gen)
 
 # =============================================================================
 # LOAD CONSTANT FIELDS (orography + land-sea mask)
@@ -184,62 +187,78 @@ network_const_input = load_hires_constants(
     fields=["orography", "lsm"],
     data_paths=data_paths
 )  # shape: 1 x lats x lons x 2
-
+print(network_const_input)
 # =============================================================================
 # OUTPUT FILE CREATION
 # =============================================================================
-def create_output_file(nc_out_path):
-    """Create the output NetCDF file and return a dict of its variables."""
+# def create_output_file(nc_out_path):
+#     """Create the output NetCDF file and return a dict of its variables."""
 
-    # Delete file if it already exists to avoid HDF lock error
-    if os.path.exists(nc_out_path):
-        os.remove(nc_out_path)
-        print(f"  → Removed existing file: {nc_out_path}")
+#     # Delete file if it already exists to avoid HDF lock error
+#     if os.path.exists(nc_out_path):
+#         os.remove(nc_out_path)
+#         print(f"  → Removed existing file: {nc_out_path}")
 
-    netcdf_dict = {}
-    rootgrp = nc.Dataset(nc_out_path, "w", format="NETCDF4")
-    netcdf_dict["rootgrp"] = rootgrp
-    rootgrp.description = "GAN 6-hour rainfall ensemble members in the ICPAC region."
+#     netcdf_dict = {}
+#     rootgrp = nc.Dataset(nc_out_path, "w", format="NETCDF4")
+#     netcdf_dict["rootgrp"] = rootgrp
+#     rootgrp.description = "GAN 6-hour rainfall ensemble members in the ICPAC region."
 
-    # Dimensions
-    rootgrp.createDimension("latitude",   len(latitude))
-    rootgrp.createDimension("longitude",  len(longitude))
-    rootgrp.createDimension("member",     ensemble_members)
-    rootgrp.createDimension("time",       None)
-    rootgrp.createDimension("valid_time", None)
+#     # Dimensions
+#     rootgrp.createDimension("latitude",   len(latitude))
+#     rootgrp.createDimension("longitude",  len(longitude))
+#     rootgrp.createDimension("member",     ensemble_members)
+#     rootgrp.createDimension("time",       None)
+#     rootgrp.createDimension("valid_time", None)
 
-    # Coordinate variables
-    latitude_data = rootgrp.createVariable("latitude", "f4", ("latitude",))
-    latitude_data.units = "degrees_north"
-    latitude_data[:] = latitude
+#     # Coordinate variables
+#     latitude_data = rootgrp.createVariable("latitude", "f4", ("latitude",))
+#     latitude_data.units = "degrees_north"
+#     latitude_data[:] = latitude
 
-    longitude_data = rootgrp.createVariable("longitude", "f4", ("longitude",))
-    longitude_data.units = "degrees_east"
-    longitude_data[:] = longitude
+#     longitude_data = rootgrp.createVariable("longitude", "f4", ("longitude",))
+#     longitude_data.units = "degrees_east"
+#     longitude_data[:] = longitude
 
-    ensemble_data = rootgrp.createVariable("member", "i4", ("member",))
-    ensemble_data.units = "ensemble member"
-    ensemble_data[:] = range(1, ensemble_members + 1)
+#     ensemble_data = rootgrp.createVariable("member", "i4", ("member",))
+#     ensemble_data.units = "ensemble member"
+#     ensemble_data[:] = range(1, ensemble_members + 1)
 
-    netcdf_dict["time_data"] = rootgrp.createVariable("time", "f4", ("time",))
-    netcdf_dict["time_data"].units = "hours since 1900-01-01 00:00:00.0"
+#     netcdf_dict["time_data"] = rootgrp.createVariable("time", "f4", ("time",))
+#     netcdf_dict["time_data"].units = "hours since 1900-01-01 00:00:00.0"
 
-    netcdf_dict["valid_time_data"] = rootgrp.createVariable(
-        "fcst_valid_time", "f4", ("time", "valid_time")
-    )
-    netcdf_dict["valid_time_data"].units = "hours since 1900-01-01 00:00:00.0"
+#     netcdf_dict["valid_time_data"] = rootgrp.createVariable(
+#         "fcst_valid_time", "f4", ("time", "valid_time")
+#     )
+#     netcdf_dict["valid_time_data"].units = "hours since 1900-01-01 00:00:00.0"
 
-    netcdf_dict["precipitation"] = rootgrp.createVariable(
-        "precipitation", "f4",
-        ("time", "member", "valid_time", "latitude", "longitude"),
-        compression="zlib",
-        chunksizes=(1, 1, 1, len(latitude), len(longitude))
-    )
-    netcdf_dict["precipitation"].units     = "mm h**-1"
-    netcdf_dict["precipitation"].long_name = "Precipitation"
+#     netcdf_dict["precipitation"] = rootgrp.createVariable(
+#         "precipitation", "f4",
+#         ("time", "member", "valid_time", "latitude", "longitude"),
+#         compression="zlib",
+#         chunksizes=(1, 1, 1, len(latitude), len(longitude))
+#     )
+#     netcdf_dict["precipitation"].units     = "mm h**-1"
+#     netcdf_dict["precipitation"].long_name = "Precipitation"
 
-    return netcdf_dict
-
+#     return netcdf_dict
+def create_output_file(n_times, n_members, n_valid_times, n_lat, n_lon):
+    """
+    Initializes a dictionary of NumPy arrays to store the forecast.
+    Note: We kept the name 'create_output_file' per your request, 
+    but it now creates a data structure in memory.
+    """
+    print(f"  → Initializing data structure: ({n_times}, {n_members}, {n_valid_times}, {n_lat}, {n_lon})")
+    
+    output_dict = {
+        "precipitation": np.zeros((n_times, n_members, n_valid_times, n_lat, n_lon), dtype=np.float32),
+        "time": np.zeros((n_times,), dtype=np.float32),
+        "fcst_valid_time": np.zeros((n_times, n_valid_times), dtype=np.float32),
+        "latitude": latitude,
+        "longitude": longitude
+    }
+    
+    return output_dict
 
 # =============================================================================
 # FIELD LOADING AND INTERPOLATION
@@ -265,14 +284,12 @@ def load_and_interpolate_field(field, d, in_time_idx, input_folder_year,
     """
 
     # --- Step 1: build the file path ---
-    hour = in_time_idx * HOURS  # 0→00h, 1→06h, 2→12h ...
+    hour = in_time_idx * HOURS  
+    print(hour)
 
-    # Group A: all time steps in one file → always load the 00h file
-    # Group B: one file per time step → use the correct hour
-    file_hour  = 0 if field in GROUP_A else hour
     input_file = (
         f"{field}_{d.year}_ngcm_{field}_2.8deg_6h_GHA"
-        f"_{d.strftime('%Y%m%d')}_{file_hour:02d}h.nc"
+        f"_{d.strftime('%Y%m%d')}_{hour:02d}h.nc"
     )
     nc_in_path = os.path.join(input_folder_year, field, str(d.year), input_file)
 
@@ -291,12 +308,10 @@ def load_and_interpolate_field(field, d, in_time_idx, input_folder_year,
 
     # --- Step 3: extract data according to group ---
     if field in GROUP_A:
-        # time dimension has 37 steps → select the correct one
-        data = data.isel(time=in_time_idx)
-        # remove surface dimension if present
+        data = data.squeeze("time")
+        # remove 
         if 'surface' in data.dims:
             data = data.squeeze("surface")
-    # Group B: already shape (longitude: 16, latitude: 18), nothing to do
 
     # convert to numpy and verify shape
     data = data.values  # (16, 18)
@@ -344,6 +359,7 @@ def make_fcst(input_folder=input_folder, output_folder=output_folder,
 
     dates       = np.asarray(dates, dtype='datetime64[ns]')
     valid_times = np.arange(start_hour, end_hour + 1, HOURS)
+    print(valid_times)
 
     for day in dates:
         d = datetime(
