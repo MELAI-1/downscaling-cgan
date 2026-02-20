@@ -11,7 +11,7 @@ INPUT:
     folder: "/content/drive/MyDrive/AIMS_project_data/NGCM/" #the place where the NGCM data are
     dates: ["2018-01-01"]
     start_hour: 0
-    end_hour: 24
+    end_hour: 18
 
 OUTPUT:
     folder: "/content/output_test/" #The place where to save the output
