@@ -10,8 +10,8 @@ MODEL:
 INPUT:
     folder: "/content/drive/MyDrive/AIMS_project_data/NGCM/" #the place where the NGCM data are
     dates: ["2018-01-01"]
-    start_hour: 30
-    end_hour: 54
+    start_hour: 0
+    end_hour: 24
 
 OUTPUT:
     folder: "/content/output_test/" #The place where to save the output
