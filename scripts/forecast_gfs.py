@@ -104,7 +104,7 @@ DATA_CONFIG_PATH  = fcst_params["Data"]["data_path"]
 
 assert start_hour % HOURS == 0, f"start_hour must be divisible by {HOURS}"
 assert end_hour   % HOURS == 0, f"end_hour must be divisible by {HOURS}"
-print(f"the start hour is":{start_hour})
+print(f"the start hour is:{start_hour}")
 print(HOURS)
 
 # =============================================================================
