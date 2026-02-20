@@ -340,7 +340,7 @@ def load_and_interpolate_field(field, d, in_time_idx, input_folder_year,
         latitude=target_lat,   # (384,)
         longitude=target_lon,  # (352,)
         method="linear"
-    ).values  # shape (352, 384) or (384, 352) → verified on first call
+    ).transpose("latitude", "longitude").values  # shape (352, 384) or (384, 352) → verified on first call
 
     print(f"  → Shape after interpolation: {data_interp.shape}")
 
