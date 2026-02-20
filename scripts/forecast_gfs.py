@@ -472,8 +472,8 @@ def make_fcst(input_folder=input_folder, output_folder=output_folder,
             for ii in range(ensemble_members):
                 gan_inputs     = [network_fcst_input, network_const_input, noise_gen()]
                 gan_prediction = gen.predict(gan_inputs, verbose=False)  # 1 x lat x lon x 1
-                netcdf_dict["precipitation"][0, ii, out_time_idx, :, :] = \
-                    denormalise(gan_prediction[0, :, :, 0])
+                # netcdf_dict["precipitation"][0, ii, out_time_idx, :, :] = \
+                #     denormalise(gan_prediction[0, :, :, 0])
                 progbar.add(1)
 
         # # Close local file
