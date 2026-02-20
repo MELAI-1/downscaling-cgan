@@ -104,7 +104,7 @@ DATA_CONFIG_PATH  = fcst_params["Data"]["data_path"]
 
 assert start_hour % HOURS == 0, f"start_hour must be divisible by {HOURS}"
 assert end_hour   % HOURS == 0, f"end_hour must be divisible by {HOURS}"
-print(start_hour)
+print(f"the start hour is":{start_hour})
 print(HOURS)
 
 # =============================================================================
@@ -176,7 +176,7 @@ weights_fn = get_weights_path(fcst_params)
 print(f"Model weights localized: {weights_fn}")
 gen.load_weights(weights_fn)
 print(f"Model successfully loaded")
-print(gen)
+gen
 
 # =============================================================================
 # LOAD CONSTANT FIELDS (orography + land-sea mask)
@@ -285,7 +285,7 @@ def load_and_interpolate_field(field, d, in_time_idx, input_folder_year,
 
     # --- Step 1: build the file path ---
     hour = in_time_idx * HOURS  
-    print(hour)
+    print(f"beginnig hour:{hour}")
 
     input_file = (
         f"{field}_{d.year}_ngcm_{field}_2.8deg_6h_GHA"
@@ -296,7 +296,7 @@ def load_and_interpolate_field(field, d, in_time_idx, input_folder_year,
     if not os.path.exists(nc_in_path):
         raise FileNotFoundError(
             f"File not found for field='{field}', "
-            f"date={d.strftime('%Y%m%d')}, hour={file_hour:02d}h\n"
+            f"date={d.strftime('%Y%m%d')}, hour={hour:02d}h\n"
             f"Path attempted: {nc_in_path}"
         )
     print(f"  → Loading: {nc_in_path}")
