@@ -176,7 +176,6 @@ weights_fn = get_weights_path(fcst_params)
 print(f"Model weights localized: {weights_fn}")
 gen.load_weights(weights_fn)
 print(f"Model successfully loaded")
-gen
 
 # =============================================================================
 # LOAD CONSTANT FIELDS (orography + land-sea mask)
@@ -394,7 +393,7 @@ def make_fcst(input_folder=input_folder, output_folder=output_folder,
         # )
 
         for out_time_idx, in_time_idx in enumerate(
-            range(start_hour // HOURS, end_hour // HOURS)
+            range(start_hour // HOURS, (end_hour // HOURS)+1)
         ):
             hour = in_time_idx * HOURS
             print(f"\n  Time step {in_time_idx} → {hour:02d}h")
